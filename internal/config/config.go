@@ -43,6 +43,9 @@ type Config struct {
 	// RemoteManagement nests management-related options under 'remote-management'.
 	RemoteManagement RemoteManagement `yaml:"remote-management" json:"-"`
 
+	// PlusManager configures the integrated CPA Manager Plus functionality.
+	PlusManager PlusManagerConfig `yaml:"plus-manager" json:"plus-manager"`
+
 	// Plugins configures dynamic plugin discovery and per-plugin settings.
 	Plugins PluginsConfig `yaml:"plugins" json:"plugins"`
 
@@ -153,6 +156,46 @@ type Config struct {
 	Payload PayloadConfig `yaml:"payload" json:"payload"`
 
 	legacyMigrationPending bool `yaml:"-" json:"-"`
+}
+
+// PlusManagerConfig controls integrated CPA Manager Plus behavior.
+type PlusManagerConfig struct {
+	Enabled          bool   `yaml:"enabled" json:"enabled"`
+	DataDir          string `yaml:"data-dir" json:"data-dir"`
+	DBPath           string `yaml:"db-path" json:"db-path"`
+	CollectorEnabled bool   `yaml:"collector-enabled" json:"collector-enabled"`
+	CollectorMode    string `yaml:"collector-mode" json:"collector-mode"`
+	PollIntervalMs   int    `yaml:"poll-interval-ms" json:"poll-interval-ms"`
+}
+
+func (cfg *Config) applyPlusManagerDefaults() {
+	if cfg == nil {
+		return
+	}
+	cfg.PlusManager.Enabled = true
+	cfg.PlusManager.DataDir = "./data"
+	cfg.PlusManager.DBPath = "./data/usage.sqlite"
+	cfg.PlusManager.CollectorEnabled = true
+	cfg.PlusManager.CollectorMode = "auto"
+	cfg.PlusManager.PollIntervalMs = 1000
+}
+
+func (cfg *Config) normalizePlusManagerConfig() {
+	if cfg == nil {
+		return
+	}
+	if strings.TrimSpace(cfg.PlusManager.DataDir) == "" {
+		cfg.PlusManager.DataDir = "./data"
+	}
+	if strings.TrimSpace(cfg.PlusManager.DBPath) == "" {
+		cfg.PlusManager.DBPath = strings.TrimRight(cfg.PlusManager.DataDir, "/\\") + "/usage.sqlite"
+	}
+	if strings.TrimSpace(cfg.PlusManager.CollectorMode) == "" {
+		cfg.PlusManager.CollectorMode = "auto"
+	}
+	if cfg.PlusManager.PollIntervalMs <= 0 {
+		cfg.PlusManager.PollIntervalMs = 1000
+	}
 }
 
 // PluginsConfig holds dynamic plugin system settings.
@@ -713,6 +756,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 			if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
 				// Missing and optional: return empty config (cloud deploy standby).
 				cfg := &Config{}
+				cfg.applyPlusManagerDefaults()
+				cfg.normalizePlusManagerConfig()
 				cfg.NormalizePluginsConfig()
 				return cfg, nil
 			}
@@ -723,6 +768,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	// In cloud deploy mode (optional=true), if file is empty or contains only whitespace, return empty config.
 	if optional && len(data) == 0 {
 		cfg := &Config{}
+		cfg.applyPlusManagerDefaults()
+		cfg.normalizePlusManagerConfig()
 		cfg.NormalizePluginsConfig()
 		return cfg, nil
 	}
@@ -742,10 +789,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	cfg.Pprof.Addr = DefaultPprofAddr
 	cfg.AmpCode.RestrictManagementToLocalhost = false // Default to false: API key auth is sufficient
 	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
+	cfg.applyPlusManagerDefaults()
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		if optional {
 			// In cloud deploy mode, if YAML parsing fails, return empty config instead of error.
 			cfgOptional := &Config{}
+			cfgOptional.applyPlusManagerDefaults()
+			cfgOptional.normalizePlusManagerConfig()
 			cfgOptional.NormalizePluginsConfig()
 			return cfgOptional, nil
 		}
@@ -811,6 +861,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		cfg.MaxRetryCredentials = 0
 	}
 
+	cfg.normalizePlusManagerConfig()
 	cfg.NormalizePluginsConfig()
 
 	// Sanitize Gemini API key configuration and migrate legacy entries.

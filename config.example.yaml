@@ -49,6 +49,15 @@ pprof:
   enable: false
   addr: "127.0.0.1:8316"
 
+# Integrated CPA Manager Plus settings.
+plus-manager:
+  enabled: true
+  data-dir: ./data
+  db-path: ./data/usage.sqlite
+  collector-enabled: true
+  collector-mode: auto
+  poll-interval-ms: 1000
+
 # Standard dynamic library plugins are trusted in-process code. They are disabled by default.
 # Build Go examples with go build -buildmode=c-shared for the target GOOS/GOARCH.
 # Other languages can implement the same C ABI and JSON method protocol.
