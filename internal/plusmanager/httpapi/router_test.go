@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"bufio"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -301,5 +302,135 @@ func TestRegisterRoutesModelPricesStoreErrors(t *testing.T) {
 	r.ServeHTTP(putW, putReq)
 	if putW.Code != http.StatusInternalServerError {
 		t.Fatalf("PUT status code = %d, want 500; body=%s", putW.Code, putW.Body.String())
+	}
+}
+
+func TestRegisterRoutesUsageImportExportUsageDashboardAndAnalytics(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer s.Close()
+
+	r := gin.New()
+	RegisterRoutes(r.Group("/v0/management/plus"), Options{Enabled: true, Store: s})
+
+	jsonl := strings.Join([]string{
+		`{"event_hash":"evt-1","timestamp_ms":1700000000000,"model":"gpt-test","endpoint":"/v1/chat/completions","method":"POST","path":"/v1/chat/completions","auth_index":"auth-1","source":"cli","source_hash":"src-1","api_key_hash":"key-1","input_tokens":10,"output_tokens":20,"total_tokens":30,"latency_ms":101}`,
+		`{"eventHash":"evt-2","timestampMs":1700000001000,"model":"gpt-test","endpoint":"/v1/responses","method":"POST","path":"/v1/responses","authIndex":"auth-2","source":"worker","sourceHash":"src-2","apiKeyHash":"key-2","tokens":5,"failed":true,"failStatusCode":500,"failSummary":"boom"}`,
+		``,
+	}, "\n")
+	importReq := httptest.NewRequest(http.MethodPost, "/v0/management/plus/usage/import", strings.NewReader(jsonl))
+	importW := httptest.NewRecorder()
+	r.ServeHTTP(importW, importReq)
+	if importW.Code != http.StatusOK {
+		t.Fatalf("import status code = %d, want 200; body=%s", importW.Code, importW.Body.String())
+	}
+	var importResp struct {
+		Added   int `json:"added"`
+		Skipped int `json:"skipped"`
+		Total   int `json:"total"`
+		Failed  int `json:"failed"`
+	}
+	if err := json.Unmarshal(importW.Body.Bytes(), &importResp); err != nil {
+		t.Fatalf("import response JSON error = %v; body=%s", err, importW.Body.String())
+	}
+	if importResp.Added != 2 || importResp.Skipped != 0 || importResp.Total != 2 || importResp.Failed != 0 {
+		t.Fatalf("import response = %#v", importResp)
+	}
+
+	usageReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/usage", nil)
+	usageW := httptest.NewRecorder()
+	r.ServeHTTP(usageW, usageReq)
+	if usageW.Code != http.StatusOK {
+		t.Fatalf("usage status code = %d, want 200; body=%s", usageW.Code, usageW.Body.String())
+	}
+	var usageResp struct {
+		TotalRequests int `json:"total_requests"`
+		SuccessCount  int `json:"success_count"`
+		FailureCount  int `json:"failure_count"`
+		TotalTokens   int `json:"total_tokens"`
+		APIs          []struct {
+			Endpoint string `json:"endpoint"`
+			Requests int    `json:"requests"`
+		} `json:"apis"`
+	}
+	if err := json.Unmarshal(usageW.Body.Bytes(), &usageResp); err != nil {
+		t.Fatalf("usage response JSON error = %v; body=%s", err, usageW.Body.String())
+	}
+	if usageResp.TotalRequests != 2 || usageResp.SuccessCount != 1 || usageResp.FailureCount != 1 || usageResp.TotalTokens != 35 || len(usageResp.APIs) != 2 {
+		t.Fatalf("usage response = %#v", usageResp)
+	}
+
+	exportReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/usage/export", nil)
+	exportW := httptest.NewRecorder()
+	r.ServeHTTP(exportW, exportReq)
+	if exportW.Code != http.StatusOK {
+		t.Fatalf("export status code = %d, want 200; body=%s", exportW.Code, exportW.Body.String())
+	}
+	if cd := exportW.Header().Get("Content-Disposition"); !strings.Contains(cd, "filename=") {
+		t.Fatalf("export missing filename Content-Disposition: %q", cd)
+	}
+	scanner := bufio.NewScanner(strings.NewReader(exportW.Body.String()))
+	exported := 0
+	for scanner.Scan() {
+		exported++
+	}
+	if exported != 2 {
+		t.Fatalf("exported rows = %d, want 2; body=%s", exported, exportW.Body.String())
+	}
+
+	dashboardReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/dashboard/summary?today_start_ms=1699999900000&now_ms=1700000100000", nil)
+	dashboardW := httptest.NewRecorder()
+	r.ServeHTTP(dashboardW, dashboardReq)
+	if dashboardW.Code != http.StatusOK {
+		t.Fatalf("dashboard status code = %d, want 200; body=%s", dashboardW.Code, dashboardW.Body.String())
+	}
+	var dashboardResp struct {
+		GeneratedAtMS int64 `json:"generated_at_ms"`
+		Today         struct {
+			TotalCalls int `json:"total_calls"`
+		} `json:"today"`
+		Rolling30M struct {
+			TotalCalls int `json:"total_calls"`
+		} `json:"rolling_30m"`
+		RecentFailure []any `json:"recent_failures"`
+	}
+	if err := json.Unmarshal(dashboardW.Body.Bytes(), &dashboardResp); err != nil {
+		t.Fatalf("dashboard response JSON error = %v; body=%s", err, dashboardW.Body.String())
+	}
+	if dashboardResp.GeneratedAtMS == 0 || dashboardResp.Today.TotalCalls != 2 || dashboardResp.Rolling30M.TotalCalls != 2 || len(dashboardResp.RecentFailure) != 1 {
+		t.Fatalf("dashboard response = %#v", dashboardResp)
+	}
+
+	analyticsReq := httptest.NewRequest(http.MethodPost, "/v0/management/plus/monitoring/analytics", strings.NewReader(`{"from_ms":1699999900000,"to_ms":1700000100000,"include":{"summary":true,"events_page":{"limit":10},"recent_failures":5}}`))
+	analyticsReq.Header.Set("Content-Type", "application/json")
+	analyticsW := httptest.NewRecorder()
+	r.ServeHTTP(analyticsW, analyticsReq)
+	if analyticsW.Code != http.StatusOK {
+		t.Fatalf("analytics status code = %d, want 200; body=%s", analyticsW.Code, analyticsW.Body.String())
+	}
+	var analyticsResp struct {
+		GeneratedAtMS int64  `json:"generated_at_ms"`
+		Granularity   string `json:"granularity"`
+		Summary       *struct {
+			TotalCalls int `json:"total_calls"`
+		} `json:"summary"`
+		Events *struct {
+			Items []struct {
+				EventHash   string `json:"event_hash"`
+				TotalTokens int    `json:"total_tokens"`
+				Failed      bool   `json:"failed"`
+			} `json:"items"`
+			HasMore bool `json:"has_more"`
+		} `json:"events"`
+		RecentFailures []any `json:"recent_failures"`
+	}
+	if err := json.Unmarshal(analyticsW.Body.Bytes(), &analyticsResp); err != nil {
+		t.Fatalf("analytics response JSON error = %v; body=%s", err, analyticsW.Body.String())
+	}
+	if analyticsResp.GeneratedAtMS == 0 || analyticsResp.Granularity == "" || analyticsResp.Summary == nil || analyticsResp.Summary.TotalCalls != 2 || analyticsResp.Events == nil || len(analyticsResp.Events.Items) != 2 || len(analyticsResp.RecentFailures) != 1 {
+		t.Fatalf("analytics response = %#v", analyticsResp)
 	}
 }

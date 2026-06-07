@@ -14,6 +14,10 @@ import (
 
 type ModelPrice = model.ModelPrice
 type APIKeyAlias = model.APIKeyAlias
+type UsageEvent = model.UsageEvent
+type UsageImportResult = model.UsageImportResult
+type UsagePayload = model.UsagePayload
+type UsageQuery = model.UsageQuery
 
 type Store struct {
 	db *sql.DB
@@ -43,6 +47,47 @@ func Open(dbPath string) (*Store, error) {
 		alias TEXT NOT NULL,
 		updated_at_ms INTEGER NOT NULL
 	)`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS usage_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		event_hash TEXT NOT NULL UNIQUE,
+		timestamp_ms INTEGER NOT NULL,
+		model TEXT NOT NULL DEFAULT '',
+		endpoint TEXT NOT NULL DEFAULT '',
+		method TEXT NOT NULL DEFAULT '',
+		path TEXT NOT NULL DEFAULT '',
+		auth_index TEXT NOT NULL DEFAULT '',
+		source TEXT NOT NULL DEFAULT '',
+		source_hash TEXT NOT NULL DEFAULT '',
+		api_key_hash TEXT NOT NULL DEFAULT '',
+		account_snapshot TEXT NOT NULL DEFAULT '',
+		auth_label_snapshot TEXT NOT NULL DEFAULT '',
+		auth_provider_snapshot TEXT NOT NULL DEFAULT '',
+		auth_project_id_snapshot TEXT NOT NULL DEFAULT '',
+		resolved_model TEXT NOT NULL DEFAULT '',
+		reasoning_effort TEXT NOT NULL DEFAULT '',
+		service_tier TEXT NOT NULL DEFAULT '',
+		executor_type TEXT NOT NULL DEFAULT '',
+		input_tokens INTEGER NOT NULL DEFAULT 0,
+		output_tokens INTEGER NOT NULL DEFAULT 0,
+		cached_tokens INTEGER NOT NULL DEFAULT 0,
+		cache_read_tokens INTEGER NOT NULL DEFAULT 0,
+		cache_creation_tokens INTEGER NOT NULL DEFAULT 0,
+		reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+		total_tokens INTEGER NOT NULL DEFAULT 0,
+		latency_ms INTEGER NOT NULL DEFAULT 0,
+		ttft_ms INTEGER NOT NULL DEFAULT 0,
+		failed INTEGER NOT NULL DEFAULT 0,
+		fail_status_code INTEGER NOT NULL DEFAULT 0,
+		fail_summary TEXT NOT NULL DEFAULT '',
+		raw_json TEXT NOT NULL DEFAULT ''
+	)`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_usage_events_timestamp_id ON usage_events(timestamp_ms DESC, id DESC)`); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -234,6 +279,200 @@ func (s *Store) DeleteAPIKeyAlias(apiKeyHash string) error {
 	}
 	_, err := s.db.Exec(`DELETE FROM api_key_aliases WHERE api_key_hash = ?`, hash)
 	return err
+}
+
+func (s *Store) ImportUsageEvents(events []UsageEvent) (UsageImportResult, error) {
+	result := UsageImportResult{Total: len(events)}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return result, err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO usage_events (
+		event_hash, timestamp_ms, model, endpoint, method, path, auth_index, source, source_hash, api_key_hash,
+		account_snapshot, auth_label_snapshot, auth_provider_snapshot, auth_project_id_snapshot,
+		resolved_model, reasoning_effort, service_tier, executor_type,
+		input_tokens, output_tokens, cached_tokens, cache_read_tokens, cache_creation_tokens, reasoning_tokens,
+		total_tokens, latency_ms, ttft_ms, failed, fail_status_code, fail_summary, raw_json
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return result, err
+	}
+	defer stmt.Close()
+
+	for _, event := range events {
+		if event.EventHash == "" {
+			result.Failed++
+			continue
+		}
+		if event.TotalTokens == 0 {
+			event.TotalTokens = event.InputTokens + event.OutputTokens + event.ReasoningTokens
+		}
+		raw := string(event.RawJSON)
+		res, err := stmt.Exec(
+			event.EventHash, event.TimestampMS, event.Model, event.Endpoint, event.Method, event.Path, event.AuthIndex, event.Source, event.SourceHash, event.APIKeyHash,
+			event.AccountSnapshot, event.AuthLabelSnapshot, event.AuthProviderSnapshot, event.AuthProjectIDSnapshot,
+			event.ResolvedModel, event.ReasoningEffort, event.ServiceTier, event.ExecutorType,
+			event.InputTokens, event.OutputTokens, event.CachedTokens, event.CacheReadTokens, event.CacheCreationTokens, event.ReasoningTokens,
+			event.TotalTokens, event.LatencyMS, event.TTFTMS, boolToInt(event.Failed), event.FailStatusCode, event.FailSummary, raw,
+		)
+		if err != nil {
+			result.Failed++
+			continue
+		}
+		affected, err := res.RowsAffected()
+		if err != nil {
+			return result, err
+		}
+		if affected == 0 {
+			result.Skipped++
+		} else {
+			result.Added++
+		}
+	}
+	return result, tx.Commit()
+}
+
+func (s *Store) UsageSummary(query UsageQuery) (UsagePayload, error) {
+	where, args := usageWhere(query)
+	var payload UsagePayload
+	row := s.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(CASE WHEN failed = 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN failed != 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(total_tokens), 0) FROM usage_events`+where, args...)
+	if err := row.Scan(&payload.TotalRequests, &payload.SuccessCount, &payload.FailureCount, &payload.TotalTokens); err != nil {
+		return payload, err
+	}
+
+	rows, err := s.db.Query(`SELECT endpoint, COUNT(*), COALESCE(SUM(total_tokens), 0), COALESCE(SUM(CASE WHEN failed = 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN failed != 0 THEN 1 ELSE 0 END), 0) FROM usage_events`+where+` GROUP BY endpoint ORDER BY COUNT(*) DESC, endpoint`, args...)
+	if err != nil {
+		return payload, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var api model.UsageAPIStat
+		if err := rows.Scan(&api.Endpoint, &api.Requests, &api.Tokens, &api.Success, &api.Failure); err != nil {
+			return payload, err
+		}
+		payload.APIs = append(payload.APIs, api)
+	}
+	return payload, rows.Err()
+}
+
+func (s *Store) ExportUsageEvents(query UsageQuery) ([]UsageEvent, error) {
+	where, args := usageWhere(query)
+	rows, err := s.db.Query(`SELECT `+usageEventColumns()+` FROM usage_events`+where+` ORDER BY timestamp_ms ASC, id ASC`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	events := []UsageEvent{}
+	for rows.Next() {
+		event, err := scanUsageEvent(rows)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+	return events, rows.Err()
+}
+
+func (s *Store) ListUsageEvents(query UsageQuery) ([]UsageEvent, bool, error) {
+	limit := query.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 500
+	}
+	where, args := usageWhere(query)
+	pageWhere := where
+	if query.BeforeMS > 0 {
+		if pageWhere == "" {
+			pageWhere = " WHERE "
+		} else {
+			pageWhere += " AND "
+		}
+		pageWhere += "(timestamp_ms < ? OR (timestamp_ms = ? AND id < ?))"
+		args = append(args, query.BeforeMS, query.BeforeMS, query.BeforeID)
+	}
+	args = append(args, limit+1)
+	rows, err := s.db.Query(`SELECT `+usageEventColumns()+` FROM usage_events`+pageWhere+` ORDER BY timestamp_ms DESC, id DESC LIMIT ?`, args...)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rows.Close()
+	events := []UsageEvent{}
+	for rows.Next() {
+		event, err := scanUsageEvent(rows)
+		if err != nil {
+			return nil, false, err
+		}
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, false, err
+	}
+	hasMore := len(events) > limit
+	if hasMore {
+		events = events[:limit]
+	}
+	return events, hasMore, nil
+}
+
+func usageWhere(query UsageQuery) (string, []any) {
+	parts := []string{}
+	args := []any{}
+	if query.FromMS > 0 {
+		parts = append(parts, "timestamp_ms >= ?")
+		args = append(args, query.FromMS)
+	}
+	if query.ToMS > 0 {
+		parts = append(parts, "timestamp_ms <= ?")
+		args = append(args, query.ToMS)
+	}
+	if len(parts) == 0 {
+		return "", args
+	}
+	return " WHERE " + parts[0] + joinAnd(parts[1:]), args
+}
+
+func joinAnd(parts []string) string {
+	out := ""
+	for _, part := range parts {
+		out += " AND " + part
+	}
+	return out
+}
+
+func usageEventColumns() string {
+	return `id, event_hash, timestamp_ms, model, endpoint, method, path, auth_index, source, source_hash, api_key_hash,
+		account_snapshot, auth_label_snapshot, auth_provider_snapshot, auth_project_id_snapshot,
+		resolved_model, reasoning_effort, service_tier, executor_type,
+		input_tokens, output_tokens, cached_tokens, cache_read_tokens, cache_creation_tokens, reasoning_tokens,
+		total_tokens, latency_ms, ttft_ms, failed, fail_status_code, fail_summary, raw_json`
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanUsageEvent(row rowScanner) (UsageEvent, error) {
+	var event UsageEvent
+	var failed int
+	var raw string
+	err := row.Scan(
+		&event.ID, &event.EventHash, &event.TimestampMS, &event.Model, &event.Endpoint, &event.Method, &event.Path, &event.AuthIndex, &event.Source, &event.SourceHash, &event.APIKeyHash,
+		&event.AccountSnapshot, &event.AuthLabelSnapshot, &event.AuthProviderSnapshot, &event.AuthProjectIDSnapshot,
+		&event.ResolvedModel, &event.ReasoningEffort, &event.ServiceTier, &event.ExecutorType,
+		&event.InputTokens, &event.OutputTokens, &event.CachedTokens, &event.CacheReadTokens, &event.CacheCreationTokens, &event.ReasoningTokens,
+		&event.TotalTokens, &event.LatencyMS, &event.TTFTMS, &failed, &event.FailStatusCode, &event.FailSummary, &raw,
+	)
+	event.Failed = failed != 0
+	event.RawJSON = []byte(raw)
+	return event, err
+}
+
+func boolToInt(v bool) int {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func normalizeAPIKeyAlias(alias APIKeyAlias, now int64) (APIKeyAlias, error) {

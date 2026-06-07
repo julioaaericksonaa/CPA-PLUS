@@ -1,6 +1,7 @@
 package store
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -110,5 +111,79 @@ func TestAPIKeyAliasesOrphanCleanup(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].APIKeyHash != activeHash || got[0].Alias != "shared alias" {
 		t.Fatalf("ListAPIKeyAliases() after orphan cleanup = %#v", got)
+	}
+}
+
+func TestUsageEventsPersistSummaryAndExport(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "usage.sqlite")
+	s, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer s.Close()
+
+	result, err := s.ImportUsageEvents([]UsageEvent{
+		{
+			EventHash:    "event-success",
+			TimestampMS:  1700000000000,
+			Model:        "gpt-test",
+			Endpoint:     "/v1/chat/completions",
+			Method:       "POST",
+			Path:         "/v1/chat/completions",
+			AuthIndex:    "auth-1",
+			Source:       "cli",
+			SourceHash:   "source-1",
+			APIKeyHash:   "key-1",
+			InputTokens:  10,
+			OutputTokens: 20,
+			TotalTokens:  30,
+			LatencyMS:    123,
+			RawJSON:      json.RawMessage(`{"event_hash":"event-success"}`),
+		},
+		{
+			EventHash:      "event-failure",
+			TimestampMS:    1700000001000,
+			Model:          "gpt-test",
+			Endpoint:       "/v1/responses",
+			Method:         "POST",
+			Path:           "/v1/responses",
+			AuthIndex:      "auth-2",
+			Source:         "worker",
+			SourceHash:     "source-2",
+			APIKeyHash:     "key-2",
+			TotalTokens:    5,
+			Failed:         true,
+			FailStatusCode: 429,
+			FailSummary:    "rate limited",
+			RawJSON:        json.RawMessage(`{"event_hash":"event-failure","failed":true}`),
+		},
+	})
+	if err != nil {
+		t.Fatalf("ImportUsageEvents() error = %v", err)
+	}
+	if result.Added != 2 || result.Skipped != 0 || result.Total != 2 || result.Failed != 0 {
+		t.Fatalf("ImportUsageEvents() = %#v", result)
+	}
+
+	summary, err := s.UsageSummary(UsageQuery{})
+	if err != nil {
+		t.Fatalf("UsageSummary() error = %v", err)
+	}
+	if summary.TotalRequests != 2 || summary.SuccessCount != 1 || summary.FailureCount != 1 || summary.TotalTokens != 35 {
+		t.Fatalf("UsageSummary() = %#v", summary)
+	}
+	if len(summary.APIs) != 2 {
+		t.Fatalf("UsageSummary().APIs = %#v", summary.APIs)
+	}
+
+	rows, err := s.ExportUsageEvents(UsageQuery{})
+	if err != nil {
+		t.Fatalf("ExportUsageEvents() error = %v", err)
+	}
+	if len(rows) != 2 || rows[0].EventHash != "event-success" || rows[1].EventHash != "event-failure" {
+		t.Fatalf("ExportUsageEvents() = %#v", rows)
+	}
+	if string(rows[0].RawJSON) == "" || string(rows[1].RawJSON) == "" {
+		t.Fatalf("ExportUsageEvents() raw json missing: %#v", rows)
 	}
 }
