@@ -49,6 +49,38 @@ func newTestServer(t *testing.T) *Server {
 	return NewServer(cfg, authManager, accessManager, configPath)
 }
 
+func newTestServerWithPlusManager(t *testing.T, enabled bool) *Server {
+	t.Helper()
+
+	gin.SetMode(gin.TestMode)
+
+	tmpDir := t.TempDir()
+	authDir := filepath.Join(tmpDir, "auth")
+	if err := os.MkdirAll(authDir, 0o700); err != nil {
+		t.Fatalf("failed to create auth dir: %v", err)
+	}
+
+	cfg := &proxyconfig.Config{
+		SDKConfig: sdkconfig.SDKConfig{
+			APIKeys: []string{"test-key"},
+		},
+		Port:    0,
+		AuthDir: authDir,
+		RemoteManagement: proxyconfig.RemoteManagement{
+			AllowRemote: true,
+		},
+		PlusManager: proxyconfig.PlusManagerConfig{
+			Enabled: enabled,
+		},
+	}
+
+	authManager := auth.NewManager(nil, nil, nil)
+	accessManager := sdkaccess.NewManager()
+
+	configPath := filepath.Join(tmpDir, "config.yaml")
+	return NewServer(cfg, authManager, accessManager, configPath)
+}
+
 func TestHealthz(t *testing.T) {
 	server := newTestServer(t)
 
@@ -84,6 +116,28 @@ func TestHealthz(t *testing.T) {
 			t.Fatalf("expected empty body for HEAD request, got %q", rr.Body.String())
 		}
 	})
+}
+
+func TestPlusManagementRoutesRespectPlusManagerEnabled(t *testing.T) {
+	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+
+	disabledServer := newTestServerWithPlusManager(t, false)
+	disabledReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/status", nil)
+	disabledReq.Header.Set("Authorization", "Bearer test-management-key")
+	disabledRR := httptest.NewRecorder()
+	disabledServer.engine.ServeHTTP(disabledRR, disabledReq)
+	if disabledRR.Code != http.StatusNotFound {
+		t.Fatalf("disabled plus status = %d, want %d body=%s", disabledRR.Code, http.StatusNotFound, disabledRR.Body.String())
+	}
+
+	enabledServer := newTestServerWithPlusManager(t, true)
+	enabledReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/status", nil)
+	enabledReq.Header.Set("Authorization", "Bearer test-management-key")
+	enabledRR := httptest.NewRecorder()
+	enabledServer.engine.ServeHTTP(enabledRR, enabledReq)
+	if enabledRR.Code != http.StatusOK {
+		t.Fatalf("enabled plus status = %d, want %d body=%s", enabledRR.Code, http.StatusOK, enabledRR.Body.String())
+	}
 }
 
 func TestManagementUsageRequiresManagementAuthAndPopsArray(t *testing.T) {

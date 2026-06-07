@@ -594,7 +594,7 @@ func (s *Server) registerManagementRoutes() {
 
 	mgmt := s.engine.Group("/v0/management")
 	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
-	plushttpapi.RegisterRoutes(mgmt.Group("/plus"), plushttpapi.Options{Enabled: true})
+	plushttpapi.RegisterRoutes(mgmt.Group("/plus"), plushttpapi.Options{Enabled: s.cfg != nil && s.cfg.PlusManager.Enabled})
 	{
 		mgmt.GET("/config", s.mgmt.GetConfig)
 		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
