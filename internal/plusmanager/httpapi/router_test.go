@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/collector"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
 )
 
@@ -26,6 +27,46 @@ func TestRegisterRoutesStatus(t *testing.T) {
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("status code = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+}
+
+type fakeCollectorStatusProvider struct{}
+
+func (fakeCollectorStatusProvider) Status() collector.Status {
+	return collector.Status{
+		Collector:     "running",
+		Mode:          "auto",
+		Queue:         "redisqueue",
+		TotalInserted: 7,
+		TotalSkipped:  2,
+		DeadLetters:   1,
+		LastError:     "boom",
+	}
+}
+
+func TestPlusRegisterRoutesCollectorStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	RegisterRoutes(r.Group("/v0/management/plus"), Options{Enabled: true, Collector: fakeCollectorStatusProvider{}})
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/management/plus/collector/status", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("collector status response is not JSON: %v; body=%s", err, w.Body.String())
+	}
+	for _, key := range []string{"collector", "mode", "queue", "lastConsumedAt", "lastInsertedAt", "totalInserted", "totalSkipped", "deadLetters", "lastError"} {
+		if _, ok := got[key]; !ok {
+			t.Fatalf("collector status missing %q: %#v", key, got)
+		}
+	}
+	if got["collector"] != "running" || got["mode"] != "auto" || got["queue"] != "redisqueue" || got["totalInserted"].(float64) != 7 {
+		t.Fatalf("collector status = %#v", got)
 	}
 }
 

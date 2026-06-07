@@ -34,6 +34,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
+	pluscollector "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/collector"
 	plushttpapi "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/httpapi"
 	plusstore "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
@@ -212,6 +213,9 @@ type Server struct {
 	// plusStore persists integrated CPA Manager Plus data.
 	plusStore *plusstore.Store
 
+	// plusCollector consumes usage events into the integrated Plus store.
+	plusCollector *pluscollector.Collector
+
 	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
 	managementRoutesRegistered atomic.Bool
 	// managementRoutesEnabled controls whether management endpoints serve real handlers.
@@ -361,7 +365,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	// or when a local management password is provided (e.g. TUI mode).
 	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
 	s.managementRoutesEnabled.Store(hasManagementSecret)
-	redisqueue.SetEnabled(hasManagementSecret || (cfg != nil && cfg.Home.Enabled))
+	redisqueue.SetEnabled(hasManagementSecret || (cfg != nil && cfg.Home.Enabled) || plusCollectorConfigured(cfg))
+	s.startPlusCollector()
 	if hasManagementSecret {
 		s.registerManagementRoutes()
 	}
@@ -602,8 +607,9 @@ func (s *Server) registerManagementRoutes() {
 	mgmt := s.engine.Group("/v0/management")
 	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
 	plusOptions := plushttpapi.Options{
-		Enabled: s.cfg != nil && s.cfg.PlusManager.Enabled,
-		Store:   s.openPlusStore(),
+		Enabled:   s.cfg != nil && s.cfg.PlusManager.Enabled,
+		Store:     s.openPlusStore(),
+		Collector: s.plusCollector,
 	}
 	plushttpapi.RegisterRoutes(mgmt.Group("/plus"), plusOptions)
 	plushttpapi.RegisterModelPriceRoutes(mgmt, plusOptions)
@@ -791,7 +797,7 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
 	return true
 }
 
-func (s *Server) openPlusStore() plushttpapi.ModelPriceStore {
+func (s *Server) openPlusStore() *plusstore.Store {
 	if s == nil || s.cfg == nil || !s.cfg.PlusManager.Enabled {
 		return nil
 	}
@@ -816,6 +822,38 @@ func (s *Server) openPlusStore() plushttpapi.ModelPriceStore {
 	}
 	s.plusStore = store
 	return store
+}
+
+func plusCollectorConfigured(cfg *config.Config) bool {
+	return cfg != nil && cfg.PlusManager.Enabled && cfg.PlusManager.CollectorEnabled
+}
+
+func (s *Server) startPlusCollector() {
+	if s == nil || s.plusCollector != nil || !plusCollectorConfigured(s.cfg) {
+		return
+	}
+	usageStore := s.openPlusStore()
+	if usageStore == nil {
+		return
+	}
+	interval := time.Duration(s.cfg.PlusManager.PollIntervalMs) * time.Millisecond
+	s.plusCollector = pluscollector.New(pluscollector.Config{
+		Mode:         s.cfg.PlusManager.CollectorMode,
+		QueueName:    "redisqueue",
+		BatchSize:    100,
+		PollInterval: interval,
+	}, pluscollector.RedisQueue{}, usageStore)
+	s.plusCollector.Start(context.Background())
+}
+
+func (s *Server) stopPlusCollector(ctx context.Context) {
+	if s == nil || s.plusCollector == nil {
+		return
+	}
+	if err := s.plusCollector.Stop(ctx); err != nil {
+		log.Debugf("failed to stop Plus usage collector: %v", err)
+	}
+	s.plusCollector = nil
 }
 
 func (s *Server) refreshPluginManagementRoutes() {
@@ -1454,6 +1492,7 @@ func (s *Server) Stop(ctx context.Context) error {
 			log.Debugf("failed to close shared listener: %v", errClose)
 		}
 	}
+	s.stopPlusCollector(ctx)
 	if s.plusStore != nil {
 		if errClose := s.plusStore.Close(); errClose != nil {
 			log.Debugf("failed to close Plus manager store: %v", errClose)
@@ -1570,6 +1609,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		util.SetLogLevel(cfg)
 	}
 
+	s.cfg = cfg
+
 	prevSecretEmpty := true
 	if oldCfg != nil {
 		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
@@ -1601,10 +1642,14 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 			s.managementRoutesEnabled.Store(!newSecretEmpty)
 		}
 	}
-	redisqueue.SetEnabled(s.managementRoutesEnabled.Load() || (cfg != nil && cfg.Home.Enabled))
+	redisqueue.SetEnabled(s.managementRoutesEnabled.Load() || (cfg != nil && cfg.Home.Enabled) || plusCollectorConfigured(cfg))
+	if plusCollectorConfigured(cfg) {
+		s.startPlusCollector()
+	} else {
+		s.stopPlusCollector(context.Background())
+	}
 
 	s.applyAccessConfig(oldCfg, cfg)
-	s.cfg = cfg
 	s.wsAuthEnabled.Store(cfg.WebsocketAuth)
 	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
 		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)

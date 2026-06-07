@@ -13,6 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/collector"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
 )
 
@@ -27,6 +28,10 @@ type APIKeyAliasStore interface {
 	DeleteAPIKeyAlias(string) error
 }
 
+type CollectorStatusProvider interface {
+	Status() collector.Status
+}
+
 type UsageStore interface {
 	UsageSummary(store.UsageQuery) (store.UsagePayload, error)
 	ImportUsageEvents([]store.UsageEvent) (store.UsageImportResult, error)
@@ -35,8 +40,9 @@ type UsageStore interface {
 }
 
 type Options struct {
-	Enabled bool
-	Store   any
+	Enabled   bool
+	Store     any
+	Collector CollectorStatusProvider
 }
 
 func RegisterRoutes(group *gin.RouterGroup, opts Options) {
@@ -56,9 +62,24 @@ func RegisterRoutes(group *gin.RouterGroup, opts Options) {
 			"setupRequired": false,
 		})
 	})
+	group.GET("/collector/status", func(c *gin.Context) {
+		handleCollectorStatus(c, opts.Collector)
+	})
 	RegisterModelPriceRoutes(group, opts)
 	RegisterAPIKeyAliasRoutes(group, opts)
 	RegisterUsageRoutes(group, opts)
+}
+
+func handleCollectorStatus(c *gin.Context, provider CollectorStatusProvider) {
+	if provider == nil {
+		c.JSON(http.StatusOK, collector.Status{
+			Collector: "stopped",
+			Mode:      "auto",
+			Queue:     "redisqueue",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, provider.Status())
 }
 
 func RegisterCompatibilityRoutes(engine *gin.Engine, opts Options) {

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -172,6 +173,33 @@ func TestPlusManagementModelPricesUseConfiguredStore(t *testing.T) {
 	}
 	if !strings.Contains(getRR.Body.String(), "gpt-test") {
 		t.Fatalf("GET model-prices body missing persisted model: %s", getRR.Body.String())
+	}
+}
+
+func TestPlusManagementCollectorStatusRoute(t *testing.T) {
+	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+
+	server := newTestServerWithPlusManagerDBPath(t, true, filepath.Join(t.TempDir(), "usage.sqlite"))
+	defer server.Stop(context.Background())
+
+	req := httptest.NewRequest(http.MethodGet, "/v0/management/plus/collector/status", nil)
+	req.Header.Set("Authorization", "Bearer test-management-key")
+	rr := httptest.NewRecorder()
+	server.engine.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("collector status code = %d, want %d body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal collector status: %v body=%s", err, rr.Body.String())
+	}
+	for _, key := range []string{"collector", "mode", "queue", "lastConsumedAt", "lastInsertedAt", "totalInserted", "totalSkipped", "deadLetters", "lastError"} {
+		if _, ok := got[key]; !ok {
+			t.Fatalf("collector status missing %q: %#v", key, got)
+		}
+	}
+	if got["mode"] != "auto" || got["queue"] != "redisqueue" {
+		t.Fatalf("collector status = %#v", got)
 	}
 }
 

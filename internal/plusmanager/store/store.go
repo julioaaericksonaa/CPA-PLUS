@@ -1,10 +1,15 @@
 package store
 
 import (
+	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -473,6 +478,201 @@ func boolToInt(v bool) int {
 		return 1
 	}
 	return 0
+}
+
+func (s *Store) InsertUsageEvent(ctx context.Context, raw json.RawMessage) error {
+	if s == nil || s.db == nil {
+		return sql.ErrConnDone
+	}
+	event, err := usageEventFromRaw(raw)
+	if err != nil {
+		return err
+	}
+	_, err = s.ImportUsageEvents([]UsageEvent{event})
+	return err
+}
+
+func usageEventFromRaw(raw json.RawMessage) (UsageEvent, error) {
+	var data map[string]any
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return UsageEvent{}, err
+	}
+	event := UsageEvent{
+		EventHash:             readString(data, "event_hash", "eventHash"),
+		TimestampMS:           readInt64(data, "timestamp_ms", "timestampMs"),
+		Model:                 readString(data, "model", "alias"),
+		Endpoint:              readString(data, "endpoint"),
+		Method:                readString(data, "method"),
+		Path:                  readString(data, "path"),
+		AuthIndex:             readString(data, "auth_index", "authIndex"),
+		Source:                readString(data, "source"),
+		SourceHash:            readString(data, "source_hash", "sourceHash"),
+		APIKeyHash:            readString(data, "api_key_hash", "apiKeyHash"),
+		AccountSnapshot:       readString(data, "account_snapshot", "accountSnapshot"),
+		AuthLabelSnapshot:     readString(data, "auth_label_snapshot", "authLabelSnapshot"),
+		AuthProviderSnapshot:  readString(data, "auth_provider_snapshot", "authProviderSnapshot", "provider"),
+		AuthProjectIDSnapshot: readString(data, "auth_project_id_snapshot", "authProjectIdSnapshot", "authProjectIDSnapshot"),
+		ResolvedModel:         readString(data, "resolved_model", "resolvedModel"),
+		ReasoningEffort:       readString(data, "reasoning_effort", "reasoningEffort"),
+		ServiceTier:           readString(data, "service_tier", "serviceTier"),
+		ExecutorType:          readString(data, "executor_type", "executorType"),
+		InputTokens:           readInt64(data, "input_tokens", "inputTokens"),
+		OutputTokens:          readInt64(data, "output_tokens", "outputTokens"),
+		CachedTokens:          readInt64(data, "cached_tokens", "cachedTokens"),
+		CacheReadTokens:       readInt64(data, "cache_read_tokens", "cacheReadTokens"),
+		CacheCreationTokens:   readInt64(data, "cache_creation_tokens", "cacheCreationTokens"),
+		ReasoningTokens:       readInt64(data, "reasoning_tokens", "reasoningTokens"),
+		TotalTokens:           readInt64(data, "total_tokens", "totalTokens"),
+		LatencyMS:             readInt64(data, "latency_ms", "latencyMs", "duration_ms", "durationMs"),
+		TTFTMS:                readInt64(data, "ttft_ms", "ttftMs"),
+		Failed:                readBool(data, "failed"),
+		FailStatusCode:        int(readInt64(data, "fail_status_code", "failStatusCode")),
+		FailSummary:           readString(data, "fail_summary", "failSummary"),
+		RawJSON:               append(json.RawMessage(nil), raw...),
+	}
+	if event.TimestampMS == 0 {
+		event.TimestampMS = readTimestampMS(data, "timestamp")
+	}
+	if tokens, ok := data["tokens"].(map[string]any); ok {
+		if event.InputTokens == 0 {
+			event.InputTokens = readInt64(tokens, "input_tokens", "inputTokens")
+		}
+		if event.OutputTokens == 0 {
+			event.OutputTokens = readInt64(tokens, "output_tokens", "outputTokens")
+		}
+		if event.CachedTokens == 0 {
+			event.CachedTokens = readInt64(tokens, "cached_tokens", "cachedTokens")
+		}
+		if event.CacheReadTokens == 0 {
+			event.CacheReadTokens = readInt64(tokens, "cache_read_tokens", "cacheReadTokens")
+		}
+		if event.CacheCreationTokens == 0 {
+			event.CacheCreationTokens = readInt64(tokens, "cache_creation_tokens", "cacheCreationTokens")
+		}
+		if event.ReasoningTokens == 0 {
+			event.ReasoningTokens = readInt64(tokens, "reasoning_tokens", "reasoningTokens")
+		}
+		if event.TotalTokens == 0 {
+			event.TotalTokens = readInt64(tokens, "total_tokens", "totalTokens")
+		}
+	}
+	if fail, ok := data["fail"].(map[string]any); ok {
+		if event.FailStatusCode == 0 {
+			event.FailStatusCode = int(readInt64(fail, "status_code", "statusCode"))
+		}
+		if event.FailSummary == "" {
+			event.FailSummary = readString(fail, "body", "summary")
+		}
+	}
+	if event.APIKeyHash == "" {
+		if apiKey := readString(data, "api_key", "apiKey"); apiKey != "" {
+			event.APIKeyHash = sha256Hex([]byte(apiKey))
+		}
+	}
+	if event.SourceHash == "" && event.Source != "" {
+		event.SourceHash = sha256Hex([]byte(event.Source))
+	}
+	if event.EventHash == "" {
+		event.EventHash = sha256Hex(raw)
+	}
+	if event.TimestampMS == 0 {
+		event.TimestampMS = time.Now().UnixMilli()
+	}
+	if event.Endpoint == "" {
+		event.Endpoint = event.Path
+	}
+	if event.Path == "" {
+		event.Path = event.Endpoint
+	}
+	if event.Method == "" && strings.Contains(event.Endpoint, " ") {
+		parts := strings.Fields(event.Endpoint)
+		if len(parts) >= 2 {
+			event.Method = parts[0]
+			event.Path = parts[1]
+		}
+	}
+	return event, nil
+}
+
+func readString(data map[string]any, keys ...string) string {
+	for _, key := range keys {
+		if value, ok := data[key]; ok && value != nil {
+			return strings.TrimSpace(toString(value))
+		}
+	}
+	return ""
+}
+
+func readInt64(data map[string]any, keys ...string) int64 {
+	for _, key := range keys {
+		value, ok := data[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case float64:
+			return int64(typed)
+		case string:
+			parsed, _ := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
+			return parsed
+		case json.Number:
+			parsed, _ := typed.Int64()
+			return parsed
+		}
+	}
+	return 0
+}
+
+func readTimestampMS(data map[string]any, keys ...string) int64 {
+	for _, key := range keys {
+		value := readString(data, key)
+		if value == "" {
+			continue
+		}
+		if parsed, err := time.Parse(time.RFC3339Nano, value); err == nil {
+			return parsed.UnixMilli()
+		}
+	}
+	return 0
+}
+
+func readBool(data map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		value, ok := data[key]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case bool:
+			return typed
+		case string:
+			return typed == "true" || typed == "1"
+		case float64:
+			return typed != 0
+		}
+	}
+	return false
+}
+
+func toString(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	case bool:
+		if typed {
+			return "true"
+		}
+		return "false"
+	default:
+		return ""
+	}
+}
+
+func sha256Hex(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
 }
 
 func normalizeAPIKeyAlias(alias APIKeyAlias, now int64) (APIKeyAlias, error) {
