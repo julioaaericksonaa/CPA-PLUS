@@ -1,3 +1,7 @@
+ARG BUILDPLATFORM=linux/amd64
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
 FROM --platform=$BUILDPLATFORM node:22-alpine AS web-build
 
 WORKDIR /web
@@ -10,7 +14,7 @@ COPY web/manager-plus ./
 
 RUN npm run build
 
-FROM golang:1.26-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -24,6 +28,8 @@ COPY . .
 
 COPY --from=web-build /web/dist/index.html ./internal/managementasset/bundled/management.html
 
+ARG TARGETOS
+ARG TARGETARCH
 ARG VERSION=dev
 ARG COMMIT=none
 ARG BUILD_DATE=unknown
