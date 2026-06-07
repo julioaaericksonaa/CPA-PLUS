@@ -1,6 +1,7 @@
 package store
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -23,5 +24,17 @@ func TestModelPricesPersist(t *testing.T) {
 	}
 	if len(got) != 1 || got[0].Model != "gpt-test" || got[0].InputPerMTok != 1.25 || got[0].OutputPerMTok != 5.5 {
 		t.Fatalf("ListModelPrices() = %#v", got)
+	}
+}
+
+func TestOpenCreatesParentDirectory(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "nested", "data", "usage.sqlite")
+	s, err := Open(dbPath)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer s.Close()
+	if _, err := os.Stat(dbPath); err != nil {
+		t.Fatalf("expected database file to exist: %v", err)
 	}
 }

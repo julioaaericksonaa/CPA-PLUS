@@ -1050,7 +1050,7 @@ export const usageServiceApi = {
   getModelPrices: async (base: string, managementKey?: string): Promise<ModelPricesResponse> => {
     return withUsageServiceError(async () => {
       const response = await axios.get<ModelPricesResponse>(
-        buildUrl(base, '/v0/management/model-prices'),
+        buildUrl(base, '/v0/management/plus/model-prices'),
         {
           timeout: USAGE_SERVICE_TIMEOUT_MS,
           headers: authHeaders(managementKey),
@@ -1067,7 +1067,7 @@ export const usageServiceApi = {
   ): Promise<ModelPricesResponse> => {
     return withUsageServiceError(async () => {
       const response = await axios.put<ModelPricesResponse>(
-        buildUrl(base, '/v0/management/model-prices'),
+        buildUrl(base, '/v0/management/plus/model-prices'),
         { prices },
         {
           timeout: USAGE_SERVICE_TIMEOUT_MS,
@@ -1148,7 +1148,7 @@ export const usageServiceApi = {
   ): Promise<ModelPriceSyncResponse> => {
     return withUsageServiceError(async () => {
       const response = await axios.post<ModelPriceSyncResponse>(
-        buildUrl(base, '/v0/management/model-prices/sync'),
+        buildUrl(base, '/v0/management/plus/model-prices/sync'),
         models ? { models } : {},
         {
           timeout: 30 * 1000,

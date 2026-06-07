@@ -51,7 +51,11 @@ func newTestServer(t *testing.T) *Server {
 
 func newTestServerWithPlusManager(t *testing.T, enabled bool) *Server {
 	t.Helper()
+	return newTestServerWithPlusManagerDBPath(t, enabled, "")
+}
 
+func newTestServerWithPlusManagerDBPath(t *testing.T, enabled bool, dbPath string) *Server {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	tmpDir := t.TempDir()
@@ -70,7 +74,12 @@ func newTestServerWithPlusManager(t *testing.T, enabled bool) *Server {
 			AllowRemote: true,
 		},
 		PlusManager: proxyconfig.PlusManagerConfig{
-			Enabled: enabled,
+			Enabled:          enabled,
+			DBPath:           dbPath,
+			DataDir:          filepath.Dir(dbPath),
+			CollectorEnabled: true,
+			CollectorMode:    "auto",
+			PollIntervalMs:   1000,
 		},
 	}
 
@@ -137,6 +146,32 @@ func TestPlusManagementRoutesRespectPlusManagerEnabled(t *testing.T) {
 	enabledServer.engine.ServeHTTP(enabledRR, enabledReq)
 	if enabledRR.Code != http.StatusOK {
 		t.Fatalf("enabled plus status = %d, want %d body=%s", enabledRR.Code, http.StatusOK, enabledRR.Body.String())
+	}
+}
+
+func TestPlusManagementModelPricesUseConfiguredStore(t *testing.T) {
+	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
+
+	server := newTestServerWithPlusManagerDBPath(t, true, filepath.Join(t.TempDir(), "usage.sqlite"))
+
+	req := httptest.NewRequest(http.MethodPut, "/v0/management/plus/model-prices", strings.NewReader(`[{"model":"gpt-test","inputPerMTok":1.25,"outputPerMTok":5.5}]`))
+	req.Header.Set("Authorization", "Bearer test-management-key")
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	server.engine.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("PUT model-prices status = %d, want %d body=%s", rr.Code, http.StatusNoContent, rr.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/model-prices", nil)
+	getReq.Header.Set("Authorization", "Bearer test-management-key")
+	getRR := httptest.NewRecorder()
+	server.engine.ServeHTTP(getRR, getReq)
+	if getRR.Code != http.StatusOK {
+		t.Fatalf("GET model-prices status = %d, want %d body=%s", getRR.Code, http.StatusOK, getRR.Body.String())
+	}
+	if !strings.Contains(getRR.Body.String(), "gpt-test") {
+		t.Fatalf("GET model-prices body missing persisted model: %s", getRR.Body.String())
 	}
 }
 

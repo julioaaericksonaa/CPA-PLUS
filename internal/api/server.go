@@ -35,6 +35,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
 	plushttpapi "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/httpapi"
+	plusstore "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v7/sdk/access"
@@ -208,6 +209,9 @@ type Server struct {
 	// pluginHost owns dynamic plugin Management API route dispatch.
 	pluginHost *pluginhost.Host
 
+	// plusStore persists integrated CPA Manager Plus data.
+	plusStore *plusstore.Store
+
 	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
 	managementRoutesRegistered atomic.Bool
 	// managementRoutesEnabled controls whether management endpoints serve real handlers.
@@ -332,6 +336,9 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 
 	// Setup routes
 	s.setupRoutes()
+	plushttpapi.RegisterCompatibilityRoutes(engine, plushttpapi.Options{
+		Enabled: cfg != nil && cfg.PlusManager.Enabled,
+	})
 
 	// Register Amp module using V2 interface with Context
 	s.ampModule = ampmodule.NewLegacy(accessManager, AuthMiddleware(accessManager))
@@ -594,7 +601,12 @@ func (s *Server) registerManagementRoutes() {
 
 	mgmt := s.engine.Group("/v0/management")
 	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
-	plushttpapi.RegisterRoutes(mgmt.Group("/plus"), plushttpapi.Options{Enabled: s.cfg != nil && s.cfg.PlusManager.Enabled})
+	plusOptions := plushttpapi.Options{
+		Enabled: s.cfg != nil && s.cfg.PlusManager.Enabled,
+		Store:   s.openPlusStore(),
+	}
+	plushttpapi.RegisterRoutes(mgmt.Group("/plus"), plusOptions)
+	plushttpapi.RegisterModelPriceRoutes(mgmt, plusOptions)
 	{
 		mgmt.GET("/config", s.mgmt.GetConfig)
 		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
@@ -777,6 +789,33 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
 		return false
 	}
 	return true
+}
+
+func (s *Server) openPlusStore() plushttpapi.ModelPriceStore {
+	if s == nil || s.cfg == nil || !s.cfg.PlusManager.Enabled {
+		return nil
+	}
+	if s.plusStore != nil {
+		return s.plusStore
+	}
+	dbPath := strings.TrimSpace(s.cfg.PlusManager.DBPath)
+	if dbPath == "" {
+		return nil
+	}
+	dbDir := filepath.Dir(dbPath)
+	if dbDir != "" && dbDir != "." {
+		if err := os.MkdirAll(dbDir, 0o755); err != nil {
+			log.WithError(err).Warn("failed to prepare Plus manager data directory")
+			return nil
+		}
+	}
+	store, err := plusstore.Open(dbPath)
+	if err != nil {
+		log.WithError(err).Warn("failed to open Plus manager store")
+		return nil
+	}
+	s.plusStore = store
+	return store
 }
 
 func (s *Server) refreshPluginManagementRoutes() {
@@ -1414,6 +1453,12 @@ func (s *Server) Stop(ctx context.Context) error {
 		if errClose := s.muxBaseListener.Close(); errClose != nil && !errors.Is(errClose, net.ErrClosed) {
 			log.Debugf("failed to close shared listener: %v", errClose)
 		}
+	}
+	if s.plusStore != nil {
+		if errClose := s.plusStore.Close(); errClose != nil {
+			log.Debugf("failed to close Plus manager store: %v", errClose)
+		}
+		s.plusStore = nil
 	}
 
 	// Shutdown the HTTP server.

@@ -84,7 +84,7 @@ Standalone persistence and visualization service for CLIProxyAPI, with periodic 
 
 Full CLIProxyAPI management center with request-level monitoring and cost estimates. CPA-Manager tracks collected requests by account, model, channel, latency, status, and token usage; estimates cost with editable model prices and one-click LiteLLM price sync; persists events in SQLite; and provides Codex account-pool operations with batch inspection, quota detection, unhealthy account discovery, cleanup suggestions, and one-click execution for day-to-day multi-account maintenance.
 
-Docker single-port CPA-PLUS deployments use the unified entry `http://host:8317/management.html`, one `remote-management.secret-key`, and persistent Plus data at `./data/usage.sqlite` by default. See [CPA-PLUS integrated deployment](docs/cpa-plus-integrated.md).
+CPA-PLUS integrated builds use the single-port entry `http://host:8317/management.html`, one `remote-management.secret-key`, and persistent Plus data at `./data/usage.sqlite` by default. The current integration includes the bundled Plus panel and model-price persistence; request monitoring and analytics backends are being ported in later phases. See [CPA-PLUS integrated deployment](docs/cpa-plus-integrated.md).
 
 ## SDK Docs
 

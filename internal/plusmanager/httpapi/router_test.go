@@ -42,6 +42,29 @@ func TestRegisterRoutesInfo(t *testing.T) {
 	}
 }
 
+func TestRegisterCompatibilityRoutesInfoAndStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	RegisterCompatibilityRoutes(r, Options{Enabled: true})
+
+	infoReq := httptest.NewRequest(http.MethodGet, "/usage-service/info", nil)
+	infoW := httptest.NewRecorder()
+	r.ServeHTTP(infoW, infoReq)
+	if infoW.Code != http.StatusOK {
+		t.Fatalf("info status code = %d, want 200; body=%s", infoW.Code, infoW.Body.String())
+	}
+	if !strings.Contains(infoW.Body.String(), "cpa-manager-plus") {
+		t.Fatalf("info body missing service id: %s", infoW.Body.String())
+	}
+
+	statusReq := httptest.NewRequest(http.MethodGet, "/status", nil)
+	statusW := httptest.NewRecorder()
+	r.ServeHTTP(statusW, statusReq)
+	if statusW.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want 200; body=%s", statusW.Code, statusW.Body.String())
+	}
+}
+
 func TestRegisterRoutesDisabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -82,12 +105,51 @@ func TestRegisterRoutesModelPricesGetPut(t *testing.T) {
 	if getW.Code != http.StatusOK {
 		t.Fatalf("GET status code = %d, want 200; body=%s", getW.Code, getW.Body.String())
 	}
-	var got []store.ModelPrice
+	var got struct {
+		Prices map[string]map[string]float64 `json:"prices"`
+	}
 	if err := json.Unmarshal(getW.Body.Bytes(), &got); err != nil {
 		t.Fatalf("GET response is not JSON model prices: %v; body=%s", err, getW.Body.String())
 	}
-	if len(got) != 1 || got[0].Model != "gpt-test" || got[0].InputPerMTok != 1.25 || got[0].OutputPerMTok != 5.5 {
+	if len(got.Prices) != 1 || got.Prices["gpt-test"]["input"] != 1.25 || got.Prices["gpt-test"]["output"] != 5.5 {
 		t.Fatalf("GET model prices = %#v", got)
+	}
+}
+
+func TestRegisterRoutesModelPricesObjectSchema(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer s.Close()
+
+	r := gin.New()
+	RegisterRoutes(r.Group("/v0/management/plus"), Options{Enabled: true, Store: s})
+
+	putBody := strings.NewReader(`{"prices":{"gpt-test":{"prompt":1.25,"completion":5.5}}}`)
+	putReq := httptest.NewRequest(http.MethodPut, "/v0/management/plus/model-prices", putBody)
+	putReq.Header.Set("Content-Type", "application/json")
+	putW := httptest.NewRecorder()
+	r.ServeHTTP(putW, putReq)
+	if putW.Code != http.StatusNoContent {
+		t.Fatalf("PUT status code = %d, want 204; body=%s", putW.Code, putW.Body.String())
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/model-prices", nil)
+	getW := httptest.NewRecorder()
+	r.ServeHTTP(getW, getReq)
+	if getW.Code != http.StatusOK {
+		t.Fatalf("GET status code = %d, want 200; body=%s", getW.Code, getW.Body.String())
+	}
+	var got struct {
+		Prices map[string]map[string]float64 `json:"prices"`
+	}
+	if err := json.Unmarshal(getW.Body.Bytes(), &got); err != nil {
+		t.Fatalf("GET response is not JSON price map: %v; body=%s", err, getW.Body.String())
+	}
+	if got.Prices["gpt-test"]["prompt"] != 1.25 || got.Prices["gpt-test"]["completion"] != 5.5 {
+		t.Fatalf("GET model price map = %#v", got)
 	}
 }
 

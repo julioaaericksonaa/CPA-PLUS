@@ -2,6 +2,8 @@ package store
 
 import (
 	"database/sql"
+	"os"
+	"path/filepath"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/model"
 	_ "modernc.org/sqlite"
@@ -14,6 +16,12 @@ type Store struct {
 }
 
 func Open(dbPath string) (*Store, error) {
+	dbDir := filepath.Dir(dbPath)
+	if dbDir != "" && dbDir != "." {
+		if err := os.MkdirAll(dbDir, 0o755); err != nil {
+			return nil, err
+		}
+	}
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		return nil, err
