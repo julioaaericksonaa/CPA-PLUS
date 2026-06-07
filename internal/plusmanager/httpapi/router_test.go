@@ -116,6 +116,76 @@ func TestRegisterRoutesModelPricesGetPut(t *testing.T) {
 	}
 }
 
+func TestRegisterRoutesAPIKeyAliasesGetPutDelete(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer s.Close()
+
+	r := gin.New()
+	RegisterRoutes(r.Group("/v0/management/plus"), Options{Enabled: true, Store: s})
+
+	hash := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	putBody := strings.NewReader(`{"items":[{"apiKeyHash":"` + hash + `","alias":"Main key","updatedAtMs":123}]}`)
+	putReq := httptest.NewRequest(http.MethodPut, "/v0/management/plus/api-key-aliases", putBody)
+	putReq.Header.Set("Content-Type", "application/json")
+	putW := httptest.NewRecorder()
+	r.ServeHTTP(putW, putReq)
+	if putW.Code != http.StatusOK {
+		t.Fatalf("PUT status code = %d, want 200; body=%s", putW.Code, putW.Body.String())
+	}
+	var putGot struct {
+		Items []store.APIKeyAlias `json:"items"`
+	}
+	if err := json.Unmarshal(putW.Body.Bytes(), &putGot); err != nil {
+		t.Fatalf("PUT response is not JSON aliases: %v; body=%s", err, putW.Body.String())
+	}
+	if len(putGot.Items) != 1 || putGot.Items[0].APIKeyHash != hash || putGot.Items[0].Alias != "Main key" || putGot.Items[0].UpdatedAtMS != 123 {
+		t.Fatalf("PUT aliases response = %#v", putGot)
+	}
+
+	getReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/api-key-aliases", nil)
+	getW := httptest.NewRecorder()
+	r.ServeHTTP(getW, getReq)
+	if getW.Code != http.StatusOK {
+		t.Fatalf("GET status code = %d, want 200; body=%s", getW.Code, getW.Body.String())
+	}
+	var getGot struct {
+		Items []store.APIKeyAlias `json:"items"`
+	}
+	if err := json.Unmarshal(getW.Body.Bytes(), &getGot); err != nil {
+		t.Fatalf("GET response is not JSON aliases: %v; body=%s", err, getW.Body.String())
+	}
+	if len(getGot.Items) != 1 || getGot.Items[0].Alias != "Main key" {
+		t.Fatalf("GET aliases response = %#v", getGot)
+	}
+
+	deleteReq := httptest.NewRequest(http.MethodDelete, "/v0/management/plus/api-key-aliases/"+hash, nil)
+	deleteW := httptest.NewRecorder()
+	r.ServeHTTP(deleteW, deleteReq)
+	if deleteW.Code != http.StatusNoContent {
+		t.Fatalf("DELETE status code = %d, want 204; body=%s", deleteW.Code, deleteW.Body.String())
+	}
+
+	getAfterDeleteReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/api-key-aliases", nil)
+	getAfterDeleteW := httptest.NewRecorder()
+	r.ServeHTTP(getAfterDeleteW, getAfterDeleteReq)
+	if getAfterDeleteW.Code != http.StatusOK {
+		t.Fatalf("GET after delete status code = %d, want 200; body=%s", getAfterDeleteW.Code, getAfterDeleteW.Body.String())
+	}
+	var afterDeleteGot struct {
+		Items []store.APIKeyAlias `json:"items"`
+	}
+	if err := json.Unmarshal(getAfterDeleteW.Body.Bytes(), &afterDeleteGot); err != nil {
+		t.Fatalf("GET after delete response is not JSON aliases: %v; body=%s", err, getAfterDeleteW.Body.String())
+	}
+	if len(afterDeleteGot.Items) != 0 {
+		t.Fatalf("GET after delete aliases response = %#v, want empty", afterDeleteGot)
+	}
+}
+
 func TestRegisterRoutesModelPricesObjectSchema(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))

@@ -16,9 +16,15 @@ type ModelPriceStore interface {
 	ReplaceModelPrices([]store.ModelPrice) error
 }
 
+type APIKeyAliasStore interface {
+	ListAPIKeyAliases() ([]store.APIKeyAlias, error)
+	UpsertAPIKeyAliasesWithActiveHashes([]store.APIKeyAlias, []string, bool) error
+	DeleteAPIKeyAlias(string) error
+}
+
 type Options struct {
 	Enabled bool
-	Store   ModelPriceStore
+	Store   any
 }
 
 func RegisterRoutes(group *gin.RouterGroup, opts Options) {
@@ -39,6 +45,7 @@ func RegisterRoutes(group *gin.RouterGroup, opts Options) {
 		})
 	})
 	RegisterModelPriceRoutes(group, opts)
+	RegisterAPIKeyAliasRoutes(group, opts)
 }
 
 func RegisterCompatibilityRoutes(engine *gin.Engine, opts Options) {
@@ -69,10 +76,25 @@ func RegisterModelPriceRoutes(group *gin.RouterGroup, opts Options) {
 		return
 	}
 	group.GET("/model-prices", func(c *gin.Context) {
-		handleGetModelPrices(c, opts.Store)
+		handleGetModelPrices(c, modelPriceStoreFromOptions(opts))
 	})
 	group.PUT("/model-prices", func(c *gin.Context) {
-		handlePutModelPrices(c, opts.Store)
+		handlePutModelPrices(c, modelPriceStoreFromOptions(opts))
+	})
+}
+
+func RegisterAPIKeyAliasRoutes(group *gin.RouterGroup, opts Options) {
+	if group == nil || !opts.Enabled {
+		return
+	}
+	group.GET("/api-key-aliases", func(c *gin.Context) {
+		handleGetAPIKeyAliases(c, apiKeyAliasStoreFromOptions(opts))
+	})
+	group.PUT("/api-key-aliases", func(c *gin.Context) {
+		handlePutAPIKeyAliases(c, apiKeyAliasStoreFromOptions(opts))
+	})
+	group.DELETE("/api-key-aliases/:apiKeyHash", func(c *gin.Context) {
+		handleDeleteAPIKeyAlias(c, apiKeyAliasStoreFromOptions(opts))
 	})
 }
 
@@ -88,6 +110,30 @@ type httpModelPrice struct {
 
 type modelPricesResponse struct {
 	Prices map[string]httpModelPrice `json:"prices"`
+}
+
+type apiKeyAliasesResponse struct {
+	Items []store.APIKeyAlias `json:"items"`
+}
+
+type putAPIKeyAliasesRequest struct {
+	Items                   []store.APIKeyAlias `json:"items"`
+	ActiveAPIKeyHashes      []string            `json:"activeApiKeyHashes,omitempty"`
+	AllowOrphanAliasCleanup bool                `json:"allowOrphanAliasCleanup,omitempty"`
+}
+
+func modelPriceStoreFromOptions(opts Options) ModelPriceStore {
+	if priceStore, ok := opts.Store.(ModelPriceStore); ok {
+		return priceStore
+	}
+	return nil
+}
+
+func apiKeyAliasStoreFromOptions(opts Options) APIKeyAliasStore {
+	if aliasStore, ok := opts.Store.(APIKeyAliasStore); ok {
+		return aliasStore
+	}
+	return nil
 }
 
 func handleGetModelPrices(c *gin.Context, priceStore ModelPriceStore) {
@@ -154,6 +200,57 @@ func toHTTPModelPrices(prices []store.ModelPrice) map[string]httpModelPrice {
 		}
 	}
 	return out
+}
+
+func handleGetAPIKeyAliases(c *gin.Context, aliasStore APIKeyAliasStore) {
+	if aliasStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "api key alias store unavailable"})
+		return
+	}
+	aliases, err := aliasStore.ListAPIKeyAliases()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "list api key aliases failed"})
+		return
+	}
+	c.JSON(http.StatusOK, apiKeyAliasesResponse{Items: aliases})
+}
+
+func handlePutAPIKeyAliases(c *gin.Context, aliasStore APIKeyAliasStore) {
+	var req putAPIKeyAliasesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+		return
+	}
+	if req.Items == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "api key aliases are required"})
+		return
+	}
+	if aliasStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "api key alias store unavailable"})
+		return
+	}
+	if err := aliasStore.UpsertAPIKeyAliasesWithActiveHashes(req.Items, req.ActiveAPIKeyHashes, req.AllowOrphanAliasCleanup); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	aliases, err := aliasStore.ListAPIKeyAliases()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "list api key aliases failed"})
+		return
+	}
+	c.JSON(http.StatusOK, apiKeyAliasesResponse{Items: aliases})
+}
+
+func handleDeleteAPIKeyAlias(c *gin.Context, aliasStore APIKeyAliasStore) {
+	if aliasStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "api key alias store unavailable"})
+		return
+	}
+	if err := aliasStore.DeleteAPIKeyAlias(c.Param("apiKeyHash")); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 func fromHTTPModelPrices(prices map[string]httpModelPrice) []store.ModelPrice {
