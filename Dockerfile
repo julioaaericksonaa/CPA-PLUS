@@ -1,3 +1,15 @@
+FROM --platform=$BUILDPLATFORM node:22-alpine AS web-build
+
+WORKDIR /web
+
+COPY web/manager-plus/package*.json ./
+
+RUN npm ci
+
+COPY web/manager-plus ./
+
+RUN npm run build
+
 FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
@@ -9,6 +21,8 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
+
+COPY --from=web-build /web/dist/index.html ./internal/managementasset/bundled/management.html
 
 ARG VERSION=dev
 ARG COMMIT=none
