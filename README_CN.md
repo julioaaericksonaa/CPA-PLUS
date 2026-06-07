@@ -84,6 +84,8 @@ CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-fo
 
 面向 CLIProxyAPI 的完整管理中心，提供请求级监控和费用预估。CPA-Manager 可按账号、模型、渠道、延迟、状态和 token 用量追踪采集到的请求；支持可编辑模型价格与一键同步 LiteLLM 价格来估算费用；用 SQLite 持久化事件；并提供面向 Codex 账号池的批量巡检、配额识别、异常账号定位、清理建议与一键执行能力，适合多账号池的日常运维管理。
 
+Docker 单端口 CPA-PLUS 部署统一入口为 `http://host:8317/management.html`，共用一个 `remote-management.secret-key`，Plus 数据默认持久化到 `./data/usage.sqlite`。见 [CPA-PLUS 集成部署说明](docs/cpa-plus-integrated.md)。
+
 ## SDK 文档
 
 - 使用文档：[docs/sdk-usage_CN.md](docs/sdk-usage_CN.md)
