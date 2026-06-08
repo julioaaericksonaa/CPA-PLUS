@@ -42,8 +42,20 @@ func Open(dbPath string) (*Store, error) {
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS model_prices (
 		model TEXT PRIMARY KEY,
 		input_per_mtok REAL NOT NULL,
-		output_per_mtok REAL NOT NULL
+		output_per_mtok REAL NOT NULL,
+		cache REAL NOT NULL DEFAULT 0,
+		cache_read REAL NOT NULL DEFAULT 0,
+		cache_creation REAL NOT NULL DEFAULT 0,
+		source TEXT NOT NULL DEFAULT '',
+		source_model_id TEXT NOT NULL DEFAULT '',
+		raw_json TEXT NOT NULL DEFAULT '',
+		updated_at_ms INTEGER NOT NULL DEFAULT 0,
+		synced_at_ms INTEGER
 	)`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if err := ensureModelPriceColumns(db); err != nil {
 		db.Close()
 		return nil, err
 	}
@@ -99,6 +111,48 @@ func Open(dbPath string) (*Store, error) {
 	return &Store{db: db}, nil
 }
 
+func ensureModelPriceColumns(db *sql.DB) error {
+	columns := map[string]bool{}
+	rows, err := db.Query(`PRAGMA table_info(model_prices)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		columns[name] = true
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	additions := map[string]string{
+		"cache":           "REAL NOT NULL DEFAULT 0",
+		"cache_read":      "REAL NOT NULL DEFAULT 0",
+		"cache_creation":  "REAL NOT NULL DEFAULT 0",
+		"source":          "TEXT NOT NULL DEFAULT ''",
+		"source_model_id": "TEXT NOT NULL DEFAULT ''",
+		"raw_json":        "TEXT NOT NULL DEFAULT ''",
+		"updated_at_ms":   "INTEGER NOT NULL DEFAULT 0",
+		"synced_at_ms":    "INTEGER",
+	}
+	for name, ddl := range additions {
+		if columns[name] {
+			continue
+		}
+		if _, err := db.Exec(`ALTER TABLE model_prices ADD COLUMN ` + name + ` ` + ddl); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *Store) Close() error {
 	if s == nil || s.db == nil {
 		return nil
@@ -107,7 +161,7 @@ func (s *Store) Close() error {
 }
 
 func (s *Store) ListModelPrices() ([]ModelPrice, error) {
-	rows, err := s.db.Query(`SELECT model, input_per_mtok, output_per_mtok FROM model_prices ORDER BY model`)
+	rows, err := s.db.Query(`SELECT model, input_per_mtok, output_per_mtok, cache, cache_read, cache_creation, source, source_model_id, raw_json, updated_at_ms, synced_at_ms FROM model_prices ORDER BY model`)
 	if err != nil {
 		return nil, err
 	}
@@ -116,8 +170,12 @@ func (s *Store) ListModelPrices() ([]ModelPrice, error) {
 	prices := []ModelPrice{}
 	for rows.Next() {
 		var price ModelPrice
-		if err := rows.Scan(&price.Model, &price.InputPerMTok, &price.OutputPerMTok); err != nil {
+		var syncedAt sql.NullInt64
+		if err := rows.Scan(&price.Model, &price.InputPerMTok, &price.OutputPerMTok, &price.Cache, &price.CacheRead, &price.CacheCreation, &price.Source, &price.SourceModelID, &price.RawJSON, &price.UpdatedAtMS, &syncedAt); err != nil {
 			return nil, err
+		}
+		if syncedAt.Valid {
+			price.SyncedAtMS = &syncedAt.Int64
 		}
 		prices = append(prices, price)
 	}
@@ -137,13 +195,17 @@ func (s *Store) ReplaceModelPrices(prices []ModelPrice) error {
 	if _, err := tx.Exec(`DELETE FROM model_prices`); err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare(`INSERT INTO model_prices (model, input_per_mtok, output_per_mtok) VALUES (?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT INTO model_prices (model, input_per_mtok, output_per_mtok, cache, cache_read, cache_creation, source, source_model_id, raw_json, updated_at_ms, synced_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 	for _, price := range prices {
-		if _, err := stmt.Exec(price.Model, price.InputPerMTok, price.OutputPerMTok); err != nil {
+		var syncedAt any
+		if price.SyncedAtMS != nil {
+			syncedAt = *price.SyncedAtMS
+		}
+		if _, err := stmt.Exec(price.Model, price.InputPerMTok, price.OutputPerMTok, price.Cache, price.CacheRead, price.CacheCreation, price.Source, price.SourceModelID, price.RawJSON, price.UpdatedAtMS, syncedAt); err != nil {
 			return err
 		}
 	}
@@ -341,25 +403,100 @@ func (s *Store) ImportUsageEvents(events []UsageEvent) (UsageImportResult, error
 
 func (s *Store) UsageSummary(query UsageQuery) (UsagePayload, error) {
 	where, args := usageWhere(query)
-	var payload UsagePayload
+	payload := UsagePayload{APIs: map[string]model.UsageAPIStat{}}
 	row := s.db.QueryRow(`SELECT COUNT(*), COALESCE(SUM(CASE WHEN failed = 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN failed != 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(total_tokens), 0) FROM usage_events`+where, args...)
 	if err := row.Scan(&payload.TotalRequests, &payload.SuccessCount, &payload.FailureCount, &payload.TotalTokens); err != nil {
 		return payload, err
 	}
 
-	rows, err := s.db.Query(`SELECT endpoint, COUNT(*), COALESCE(SUM(total_tokens), 0), COALESCE(SUM(CASE WHEN failed = 0 THEN 1 ELSE 0 END), 0), COALESCE(SUM(CASE WHEN failed != 0 THEN 1 ELSE 0 END), 0) FROM usage_events`+where+` GROUP BY endpoint ORDER BY COUNT(*) DESC, endpoint`, args...)
+	events, err := s.ExportUsageEvents(query)
 	if err != nil {
 		return payload, err
 	}
-	defer rows.Close()
-	for rows.Next() {
-		var api model.UsageAPIStat
-		if err := rows.Scan(&api.Endpoint, &api.Requests, &api.Tokens, &api.Success, &api.Failure); err != nil {
-			return payload, err
+	for _, event := range events {
+		endpoint := usageEndpointKey(event)
+		api := payload.APIs[endpoint]
+		if api.Endpoint == "" {
+			api.Endpoint = endpoint
+			api.Models = map[string]model.UsageModelStat{}
 		}
-		payload.APIs = append(payload.APIs, api)
+		api.Requests++
+		api.Tokens += event.TotalTokens
+		if event.Failed {
+			api.Failure++
+		} else {
+			api.Success++
+		}
+
+		modelName := strings.TrimSpace(event.Model)
+		if modelName == "" {
+			modelName = "unknown"
+		}
+		modelStat := api.Models[modelName]
+		modelStat.Requests++
+		modelStat.Tokens += event.TotalTokens
+		if event.Failed {
+			modelStat.Failure++
+		} else {
+			modelStat.Success++
+		}
+		modelStat.Details = append(modelStat.Details, usageEventDetail(event))
+		api.Models[modelName] = modelStat
+		payload.APIs[endpoint] = api
 	}
-	return payload, rows.Err()
+	return payload, nil
+}
+
+func usageEndpointKey(event UsageEvent) string {
+	method := strings.TrimSpace(event.Method)
+	path := strings.TrimSpace(event.Path)
+	if method != "" && path != "" {
+		return method + " " + path
+	}
+	endpoint := strings.TrimSpace(event.Endpoint)
+	if endpoint != "" {
+		return endpoint
+	}
+	if path != "" {
+		return path
+	}
+	return "unknown"
+}
+
+func usageEventDetail(event UsageEvent) model.UsageDetail {
+	return model.UsageDetail{
+		Timestamp:             time.UnixMilli(event.TimestampMS).UTC().Format(time.RFC3339Nano),
+		TimestampMS:           event.TimestampMS,
+		Source:                event.Source,
+		AuthIndex:             event.AuthIndex,
+		APIKeyHash:            event.APIKeyHash,
+		AccountSnapshot:       event.AccountSnapshot,
+		AuthLabelSnapshot:     event.AuthLabelSnapshot,
+		AuthProviderSnapshot:  event.AuthProviderSnapshot,
+		AuthProjectIDSnapshot: event.AuthProjectIDSnapshot,
+		ResolvedModel:         event.ResolvedModel,
+		ReasoningEffort:       event.ReasoningEffort,
+		ServiceTier:           event.ServiceTier,
+		ExecutorType:          event.ExecutorType,
+		LatencyMS:             event.LatencyMS,
+		TTFTMS:                event.TTFTMS,
+		Tokens: model.UsageDetailTokens{
+			InputTokens:         event.InputTokens,
+			OutputTokens:        event.OutputTokens,
+			CachedTokens:        event.CachedTokens,
+			CacheReadTokens:     event.CacheReadTokens,
+			CacheCreationTokens: event.CacheCreationTokens,
+			ReasoningTokens:     event.ReasoningTokens,
+			TotalTokens:         event.TotalTokens,
+		},
+		Failed:         event.Failed,
+		FailStatusCode: event.FailStatusCode,
+		FailSummary:    event.FailSummary,
+		Fail: model.UsageDetailFail{
+			StatusCode: event.FailStatusCode,
+			Summary:    event.FailSummary,
+		},
+	}
 }
 
 func (s *Store) ExportUsageEvents(query UsageQuery) ([]UsageEvent, error) {

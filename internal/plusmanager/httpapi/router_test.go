@@ -137,8 +137,8 @@ func TestRegisterRoutesModelPricesGetPut(t *testing.T) {
 	putReq.Header.Set("Content-Type", "application/json")
 	putW := httptest.NewRecorder()
 	r.ServeHTTP(putW, putReq)
-	if putW.Code != http.StatusNoContent {
-		t.Fatalf("PUT status code = %d, want 204; body=%s", putW.Code, putW.Body.String())
+	if putW.Code != http.StatusOK {
+		t.Fatalf("PUT status code = %d, want 200; body=%s", putW.Code, putW.Body.String())
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/model-prices", nil)
@@ -155,6 +155,55 @@ func TestRegisterRoutesModelPricesGetPut(t *testing.T) {
 	}
 	if len(got.Prices) != 1 || got.Prices["gpt-test"]["input"] != 1.25 || got.Prices["gpt-test"]["output"] != 5.5 {
 		t.Fatalf("GET model prices = %#v", got)
+	}
+}
+
+func TestRegisterRoutesModelPricesSync(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer s.Close()
+
+	priceServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"gpt-sync": {"input_cost_per_token": 0.00000125, "output_cost_per_token": 0.0000055, "cache_read_input_token_cost": 0.0000001},
+			"no-price": {"max_tokens": 123}
+		}`))
+	}))
+	defer priceServer.Close()
+	oldURL := modelPriceSyncURL
+	modelPriceSyncURL = priceServer.URL
+	defer func() { modelPriceSyncURL = oldURL }()
+
+	r := gin.New()
+	RegisterRoutes(r.Group("/v0/management/plus"), Options{Enabled: true, Store: s})
+
+	req := httptest.NewRequest(http.MethodPost, "/v0/management/plus/model-prices/sync", strings.NewReader(`{"models":["gpt-sync","missing"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("sync status code = %d, want 200; body=%s", w.Code, w.Body.String())
+	}
+	var got struct {
+		Imported  int                       `json:"imported"`
+		Skipped   int                       `json:"skipped"`
+		Unmatched []string                  `json:"unmatched"`
+		Prices    map[string]map[string]any `json:"prices"`
+		Matched   map[string]map[string]any `json:"matched"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("sync response is not JSON: %v; body=%s", err, w.Body.String())
+	}
+	if got.Imported != 1 || len(got.Unmatched) != 1 || got.Unmatched[0] != "missing" {
+		t.Fatalf("sync result = %#v", got)
+	}
+	if got.Prices["gpt-sync"]["prompt"].(float64) != 1.25 || got.Prices["gpt-sync"]["completion"].(float64) != 5.5 {
+		t.Fatalf("sync prices = %#v", got.Prices)
 	}
 }
 
@@ -244,8 +293,8 @@ func TestRegisterRoutesModelPricesObjectSchema(t *testing.T) {
 	putReq.Header.Set("Content-Type", "application/json")
 	putW := httptest.NewRecorder()
 	r.ServeHTTP(putW, putReq)
-	if putW.Code != http.StatusNoContent {
-		t.Fatalf("PUT status code = %d, want 204; body=%s", putW.Code, putW.Body.String())
+	if putW.Code != http.StatusOK {
+		t.Fatalf("PUT status code = %d, want 200; body=%s", putW.Code, putW.Body.String())
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/model-prices", nil)
@@ -392,9 +441,14 @@ func TestRegisterRoutesUsageImportExportUsageDashboardAndAnalytics(t *testing.T)
 		SuccessCount  int `json:"success_count"`
 		FailureCount  int `json:"failure_count"`
 		TotalTokens   int `json:"total_tokens"`
-		APIs          []struct {
+		APIs          map[string]struct {
 			Endpoint string `json:"endpoint"`
 			Requests int    `json:"requests"`
+			Models   map[string]struct {
+				Details []struct {
+					Timestamp string `json:"timestamp"`
+				} `json:"details"`
+			} `json:"models"`
 		} `json:"apis"`
 	}
 	if err := json.Unmarshal(usageW.Body.Bytes(), &usageResp); err != nil {
@@ -402,6 +456,10 @@ func TestRegisterRoutesUsageImportExportUsageDashboardAndAnalytics(t *testing.T)
 	}
 	if usageResp.TotalRequests != 2 || usageResp.SuccessCount != 1 || usageResp.FailureCount != 1 || usageResp.TotalTokens != 35 || len(usageResp.APIs) != 2 {
 		t.Fatalf("usage response = %#v", usageResp)
+	}
+	api := usageResp.APIs["POST /v1/chat/completions"]
+	if api.Requests != 1 || len(api.Models["gpt-test"].Details) != 1 || api.Models["gpt-test"].Details[0].Timestamp == "" {
+		t.Fatalf("usage response apis = %#v", usageResp.APIs)
 	}
 
 	exportReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/usage/export", nil)

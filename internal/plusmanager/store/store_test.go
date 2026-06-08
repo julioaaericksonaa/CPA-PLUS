@@ -175,6 +175,11 @@ func TestUsageEventsPersistSummaryAndExport(t *testing.T) {
 	if len(summary.APIs) != 2 {
 		t.Fatalf("UsageSummary().APIs = %#v", summary.APIs)
 	}
+	api := summary.APIs["POST /v1/chat/completions"]
+	model := api.Models["gpt-test"]
+	if api.Requests != 1 || model.Requests != 1 || len(model.Details) != 1 || model.Details[0].Tokens.TotalTokens != 30 {
+		t.Fatalf("UsageSummary().APIs detail = %#v", summary.APIs)
+	}
 
 	rows, err := s.ExportUsageEvents(UsageQuery{})
 	if err != nil {

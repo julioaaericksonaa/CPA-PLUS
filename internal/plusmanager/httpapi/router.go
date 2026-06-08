@@ -2,9 +2,11 @@ package httpapi
 
 import (
 	"bufio"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -21,6 +23,8 @@ type ModelPriceStore interface {
 	ListModelPrices() ([]store.ModelPrice, error)
 	ReplaceModelPrices([]store.ModelPrice) error
 }
+
+var modelPriceSyncURL = "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json"
 
 type APIKeyAliasStore interface {
 	ListAPIKeyAliases() ([]store.APIKeyAlias, error)
@@ -51,9 +55,16 @@ func RegisterRoutes(group *gin.RouterGroup, opts Options) {
 	}
 
 	group.GET("/status", func(c *gin.Context) {
+		collectorStatus := collector.Status{Collector: "stopped", Mode: "auto", Queue: "redisqueue"}
+		if opts.Collector != nil {
+			collectorStatus = opts.Collector.Status()
+		}
 		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-			"mode":   "integrated",
+			"status":      "ok",
+			"service":     "cpa-manager-plus",
+			"mode":        "integrated",
+			"collector":   collectorStatus,
+			"deadLetters": collectorStatus.DeadLetters,
 		})
 	})
 	group.GET("/info", func(c *gin.Context) {
@@ -103,6 +114,42 @@ func RegisterCompatibilityRoutes(engine *gin.Engine, opts Options) {
 			"mode":    "integrated",
 		})
 	})
+	engine.GET("/usage-service/config", func(c *gin.Context) {
+		c.JSON(http.StatusOK, integratedManagerConfigResponse())
+	})
+	engine.PUT("/usage-service/config", func(c *gin.Context) {
+		c.JSON(http.StatusOK, integratedManagerConfigResponse())
+	})
+}
+
+func integratedManagerConfigResponse() gin.H {
+	return gin.H{
+		"source": "integrated",
+		"config": gin.H{
+			"cpaConnection": gin.H{
+				"cpaBaseUrl":    "integrated",
+				"managementKey": "integrated",
+			},
+			"collector": gin.H{
+				"enabled":        true,
+				"collectorMode":  "auto",
+				"queue":          "redisqueue",
+				"popSide":        "left",
+				"batchSize":      100,
+				"pollIntervalMs": 1000,
+				"queryLimit":     100,
+			},
+			"externalUsageService": gin.H{
+				"enabled":     false,
+				"serviceBase": "",
+			},
+		},
+		"cpaUsage": gin.H{
+			"usageStatisticsEnabled":          true,
+			"redisUsageQueueRetentionSeconds": 60,
+			"retentionSourceDefault":          true,
+		},
+	}
 }
 
 func RegisterModelPriceRoutes(group *gin.RouterGroup, opts Options) {
@@ -114,6 +161,9 @@ func RegisterModelPriceRoutes(group *gin.RouterGroup, opts Options) {
 	})
 	group.PUT("/model-prices", func(c *gin.Context) {
 		handlePutModelPrices(c, modelPriceStoreFromOptions(opts))
+	})
+	group.POST("/model-prices/sync", func(c *gin.Context) {
+		handleSyncModelPrices(c, modelPriceStoreFromOptions(opts))
 	})
 }
 
@@ -167,14 +217,43 @@ type httpModelPrice struct {
 	Prompt        float64 `json:"prompt,omitempty"`
 	Completion    float64 `json:"completion,omitempty"`
 	Cache         float64 `json:"cache,omitempty"`
+	CacheRead     float64 `json:"cacheRead,omitempty"`
+	CacheCreation float64 `json:"cacheCreation,omitempty"`
 	Input         float64 `json:"input,omitempty"`
 	Output        float64 `json:"output,omitempty"`
 	InputPerMTok  float64 `json:"inputPerMTok,omitempty"`
 	OutputPerMTok float64 `json:"outputPerMTok,omitempty"`
+	Source        string  `json:"source,omitempty"`
+	SourceModelID string  `json:"sourceModelId,omitempty"`
+	RawJSON       string  `json:"rawJson,omitempty"`
+	UpdatedAtMS   int64   `json:"updatedAtMs,omitempty"`
+	SyncedAtMS    *int64  `json:"syncedAtMs,omitempty"`
 }
 
 type modelPricesResponse struct {
 	Prices map[string]httpModelPrice `json:"prices"`
+}
+
+type modelPriceSyncRequest struct {
+	Models []string `json:"models"`
+}
+
+type modelPriceSyncResponse struct {
+	Source        string                    `json:"source"`
+	Sources       []string                  `json:"sources,omitempty"`
+	Imported      int                       `json:"imported"`
+	Skipped       int                       `json:"skipped"`
+	Matched       map[string]httpModelPrice `json:"matched,omitempty"`
+	Unmatched     []string                  `json:"unmatched,omitempty"`
+	SourceResults []modelPriceSourceResult  `json:"sourceResults,omitempty"`
+	Prices        map[string]httpModelPrice `json:"prices"`
+}
+
+type modelPriceSourceResult struct {
+	Source  string `json:"source"`
+	Models  int    `json:"models"`
+	Skipped int    `json:"skipped"`
+	Error   string `json:"error,omitempty"`
 }
 
 type apiKeyAliasesResponse struct {
@@ -234,7 +313,12 @@ func handlePutModelPrices(c *gin.Context, priceStore ModelPriceStore) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "replace model prices failed"})
 		return
 	}
-	c.Status(http.StatusNoContent)
+	saved, err := priceStore.ListModelPrices()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "list model prices failed"})
+		return
+	}
+	c.JSON(http.StatusOK, modelPricesResponse{Prices: toHTTPModelPrices(saved)})
 }
 
 func bindModelPrices(c *gin.Context) ([]store.ModelPrice, bool) {
@@ -265,13 +349,196 @@ func toHTTPModelPrices(prices []store.ModelPrice) map[string]httpModelPrice {
 		out[model] = httpModelPrice{
 			Prompt:        price.InputPerMTok,
 			Completion:    price.OutputPerMTok,
+			Cache:         price.Cache,
+			CacheRead:     price.CacheRead,
+			CacheCreation: price.CacheCreation,
 			Input:         price.InputPerMTok,
 			Output:        price.OutputPerMTok,
 			InputPerMTok:  price.InputPerMTok,
 			OutputPerMTok: price.OutputPerMTok,
+			Source:        price.Source,
+			SourceModelID: price.SourceModelID,
+			RawJSON:       price.RawJSON,
+			UpdatedAtMS:   price.UpdatedAtMS,
+			SyncedAtMS:    price.SyncedAtMS,
 		}
 	}
 	return out
+}
+
+func handleSyncModelPrices(c *gin.Context, priceStore ModelPriceStore) {
+	if priceStore == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "model price store unavailable"})
+		return
+	}
+	var req modelPriceSyncRequest
+	if c.Request.Body != nil {
+		body, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			return
+		}
+		if len(strings.TrimSpace(string(body))) > 0 {
+			if err := json.Unmarshal(body, &req); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+				return
+			}
+		}
+	}
+
+	remotePrices, skipped, err := fetchLiteLLMModelPrices(c.Request.Context(), modelPriceSyncURL)
+	if err != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	selection := selectModelPrices(remotePrices, req.Models)
+	existing, err := priceStore.ListModelPrices()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "list model prices failed"})
+		return
+	}
+	merged := make(map[string]store.ModelPrice, len(existing)+len(selection.matched))
+	for _, price := range existing {
+		merged[price.Model] = price
+	}
+	for model, price := range selection.matched {
+		price.Model = model
+		merged[model] = price
+	}
+	mergedList := make([]store.ModelPrice, 0, len(merged))
+	for _, price := range merged {
+		mergedList = append(mergedList, price)
+	}
+	if err := priceStore.ReplaceModelPrices(mergedList); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "replace model prices failed"})
+		return
+	}
+	prices, err := priceStore.ListModelPrices()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "list model prices failed"})
+		return
+	}
+	c.JSON(http.StatusOK, modelPriceSyncResponse{
+		Source:        "litellm",
+		Sources:       []string{"litellm"},
+		Imported:      len(selection.matched),
+		Skipped:       skipped + len(selection.unmatched),
+		Matched:       toHTTPModelPricesMap(selection.matched),
+		Unmatched:     selection.unmatched,
+		SourceResults: []modelPriceSourceResult{{Source: "litellm", Models: len(remotePrices), Skipped: skipped}},
+		Prices:        toHTTPModelPrices(prices),
+	})
+}
+
+type modelPriceSelection struct {
+	matched   map[string]store.ModelPrice
+	unmatched []string
+}
+
+func selectModelPrices(remote map[string]store.ModelPrice, models []string) modelPriceSelection {
+	selection := modelPriceSelection{matched: map[string]store.ModelPrice{}}
+	if len(models) == 0 {
+		for model, price := range remote {
+			selection.matched[model] = price
+		}
+		return selection
+	}
+	seen := map[string]bool{}
+	for _, model := range models {
+		model = strings.TrimSpace(model)
+		if model == "" || seen[model] {
+			continue
+		}
+		seen[model] = true
+		if price, ok := remote[model]; ok {
+			selection.matched[model] = price
+			continue
+		}
+		selection.unmatched = append(selection.unmatched, model)
+	}
+	return selection
+}
+
+func toHTTPModelPricesMap(prices map[string]store.ModelPrice) map[string]httpModelPrice {
+	out := make(map[string]httpModelPrice, len(prices))
+	for model, price := range prices {
+		price.Model = model
+		out[model] = toHTTPModelPrices([]store.ModelPrice{price})[model]
+	}
+	return out
+}
+
+func fetchLiteLLMModelPrices(ctx context.Context, syncURL string) (map[string]store.ModelPrice, int, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSpace(syncURL), nil)
+	if err != nil {
+		return nil, 0, errors.New("model price sync failed: " + err.Error())
+	}
+	res, err := (&http.Client{Timeout: 30 * time.Second}).Do(req)
+	if err != nil {
+		return nil, 0, errors.New("model price sync failed: " + err.Error())
+	}
+	defer res.Body.Close()
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return nil, 0, errors.New("model price sync failed: " + res.Status)
+	}
+	var raw map[string]map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&raw); err != nil {
+		return nil, 0, err
+	}
+	now := time.Now().UnixMilli()
+	prices := map[string]store.ModelPrice{}
+	skipped := 0
+	for model, entry := range raw {
+		input, hasInput := readFloat(entry, "input_cost_per_token")
+		output, hasOutput := readFloat(entry, "output_cost_per_token")
+		cacheRead, hasCacheRead := readFirstFloat(entry, "cache_read_input_token_cost", "input_cache_read")
+		cacheCreation, hasCacheCreation := readFirstFloat(entry, "cache_creation_input_token_cost", "cache_write_input_token_cost", "input_cache_write", "input_cache_creation")
+		if !hasInput && !hasOutput && !hasCacheRead && !hasCacheCreation {
+			skipped++
+			continue
+		}
+		rawEntry, _ := json.Marshal(entry)
+		syncedAt := now
+		prices[model] = store.ModelPrice{
+			Model:         model,
+			InputPerMTok:  input * 1_000_000,
+			OutputPerMTok: output * 1_000_000,
+			Cache:         cacheRead * 1_000_000,
+			CacheRead:     cacheRead * 1_000_000,
+			CacheCreation: cacheCreation * 1_000_000,
+			Source:        "litellm",
+			SourceModelID: model,
+			RawJSON:       string(rawEntry),
+			UpdatedAtMS:   now,
+			SyncedAtMS:    &syncedAt,
+		}
+	}
+	return prices, skipped, nil
+}
+
+func readFloat(entry map[string]any, key string) (float64, bool) {
+	value, ok := entry[key]
+	if !ok {
+		return 0, false
+	}
+	switch typed := value.(type) {
+	case float64:
+		return typed, true
+	case string:
+		parsed, err := strconv.ParseFloat(strings.TrimSpace(typed), 64)
+		return parsed, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func readFirstFloat(entry map[string]any, keys ...string) (float64, bool) {
+	for _, key := range keys {
+		if value, ok := readFloat(entry, key); ok {
+			return value, true
+		}
+	}
+	return 0, false
 }
 
 func handleGetAPIKeyAliases(c *gin.Context, aliasStore APIKeyAliasStore) {
@@ -350,6 +617,14 @@ func fromHTTPModelPrices(prices map[string]httpModelPrice) []store.ModelPrice {
 			Model:         model,
 			InputPerMTok:  input,
 			OutputPerMTok: output,
+			Cache:         price.Cache,
+			CacheRead:     price.CacheRead,
+			CacheCreation: price.CacheCreation,
+			Source:        price.Source,
+			SourceModelID: price.SourceModelID,
+			RawJSON:       price.RawJSON,
+			UpdatedAtMS:   price.UpdatedAtMS,
+			SyncedAtMS:    price.SyncedAtMS,
 		})
 	}
 	return out

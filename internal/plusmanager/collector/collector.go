@@ -26,15 +26,15 @@ type Config struct {
 }
 
 type Status struct {
-	Collector      string     `json:"collector"`
-	Mode           string     `json:"mode"`
-	Queue          string     `json:"queue"`
-	LastConsumedAt *time.Time `json:"lastConsumedAt"`
-	LastInsertedAt *time.Time `json:"lastInsertedAt"`
-	TotalInserted  int64      `json:"totalInserted"`
-	TotalSkipped   int64      `json:"totalSkipped"`
-	DeadLetters    int64      `json:"deadLetters"`
-	LastError      string     `json:"lastError"`
+	Collector      string `json:"collector"`
+	Mode           string `json:"mode"`
+	Queue          string `json:"queue"`
+	LastConsumedAt *int64 `json:"lastConsumedAt"`
+	LastInsertedAt *int64 `json:"lastInsertedAt"`
+	TotalInserted  int64  `json:"totalInserted"`
+	TotalSkipped   int64  `json:"totalSkipped"`
+	DeadLetters    int64  `json:"deadLetters"`
+	LastError      string `json:"lastError"`
 }
 
 type Collector struct {
@@ -97,6 +97,8 @@ func (c *Collector) Start(ctx context.Context) {
 		return
 	}
 	c.running = true
+	c.stopCh = make(chan struct{})
+	c.doneCh = make(chan struct{})
 	c.mu.Unlock()
 
 	go c.run(ctx)
@@ -201,8 +203,8 @@ func (c *Collector) Status() Status {
 		Collector:      collector,
 		Mode:           c.mode,
 		Queue:          c.queueName,
-		LastConsumedAt: cloneTimePtr(c.lastConsumedAt),
-		LastInsertedAt: cloneTimePtr(c.lastInsertedAt),
+		LastConsumedAt: timePtrMillis(c.lastConsumedAt),
+		LastInsertedAt: timePtrMillis(c.lastInsertedAt),
 		TotalInserted:  c.totalInserted,
 		TotalSkipped:   c.totalSkipped,
 		DeadLetters:    c.deadLetters,
@@ -224,10 +226,10 @@ func (c *Collector) recordDeadLetter(message string) {
 	c.lastError = message
 }
 
-func cloneTimePtr(t *time.Time) *time.Time {
+func timePtrMillis(t *time.Time) *int64 {
 	if t == nil {
 		return nil
 	}
-	cloned := *t
-	return &cloned
+	millis := t.UnixMilli()
+	return &millis
 }

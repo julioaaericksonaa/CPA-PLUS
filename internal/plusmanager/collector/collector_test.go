@@ -96,3 +96,30 @@ func TestPlusCollectorPollOnceSkipsInvalidJSONAndCountsStoreFailuresAsDeadLetter
 		t.Fatalf("last error empty, want failure details")
 	}
 }
+
+func TestPlusCollectorCanRestartAfterStop(t *testing.T) {
+	q := &fakeQueue{}
+	s := &fakeStore{}
+	c := New(Config{PollInterval: time.Hour}, q, s)
+
+	ctx1, cancel1 := context.WithCancel(context.Background())
+	c.Start(ctx1)
+	if err := c.Stop(context.Background()); err != nil {
+		cancel1()
+		t.Fatalf("first Stop() error = %v", err)
+	}
+	cancel1()
+
+	ctx2, cancel2 := context.WithCancel(context.Background())
+	defer cancel2()
+	c.Start(ctx2)
+	if status := c.Status(); status.Collector != "running" {
+		t.Fatalf("status after restart = %#v, want running", status)
+	}
+	if err := c.Stop(context.Background()); err != nil {
+		t.Fatalf("second Stop() error = %v", err)
+	}
+	if status := c.Status(); status.Collector != "stopped" {
+		t.Fatalf("status after second stop = %#v, want stopped", status)
+	}
+}

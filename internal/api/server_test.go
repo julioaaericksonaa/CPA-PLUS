@@ -160,8 +160,11 @@ func TestPlusManagementModelPricesUseConfiguredStore(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	server.engine.ServeHTTP(rr, req)
-	if rr.Code != http.StatusNoContent {
-		t.Fatalf("PUT model-prices status = %d, want %d body=%s", rr.Code, http.StatusNoContent, rr.Body.String())
+	if rr.Code != http.StatusOK {
+		t.Fatalf("PUT model-prices status = %d, want %d body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	if !strings.Contains(rr.Body.String(), "gpt-test") {
+		t.Fatalf("PUT model-prices body missing persisted model: %s", rr.Body.String())
 	}
 
 	getReq := httptest.NewRequest(http.MethodGet, "/v0/management/plus/model-prices", nil)
