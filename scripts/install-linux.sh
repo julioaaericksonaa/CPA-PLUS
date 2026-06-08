@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${CPA_PLUS_APP_DIR:-/root/apps/cliproxyapi-plus}"
-PORT="${CPA_PLUS_PORT:-$(cat "${ROOT_DIR}/PORT" 2>/dev/null || echo 8318)}"
+PORT="${CPA_PLUS_PORT:-$(cat "${ROOT_DIR}/PORT" 2>/dev/null || echo 8317)}"
 DIST_DIR="${CPA_PLUS_DIST_DIR:-${ROOT_DIR}/dist}"
 BINARY_NAME="${CPA_PLUS_BINARY_NAME:-CLIProxyAPI-linux-amd64}"
 SOURCE_DIR="${CPA_PLUS_OUTPUT_SOURCE:-${ROOT_DIR}/.build/out/CLIProxyAPI}"
