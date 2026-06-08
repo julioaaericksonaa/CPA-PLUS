@@ -1,225 +1,269 @@
-# CLI 代理 API
+# CPA-PLUS
 
-[English](README.md) | 中文 | [日本語](README_JA.md)
+CPA-PLUS 是一个本地维护的 **CLIProxyAPI + CPA-Manager-Plus 整合版**。
 
-一个为 CLI 提供 OpenAI/Gemini/Claude/Codex/Grok 兼容 API 接口的代理服务器。
+它把 CLI Proxy API 主服务、完整 Plus Web 管理面板、请求统计持久化与 Plus 扩展 API 合并到同一个项目中，目标是减少部署和维护成本：
 
-现已支持通过 OAuth 登录接入 OpenAI Codex（GPT 系列）和 Claude Code。
+- 一个项目
+- 一个 Docker 镜像/容器
+- 一个端口：`8317`
+- 一个入口：`http://host:8317/management.html`
+- 一个管理密钥：`remote-management.secret-key`
 
-您可以使用本地或多账户的CLI方式，通过任何与 OpenAI（包括Responses）/Gemini/Claude 兼容的客户端和SDK进行访问。
+> 本仓库适合私有自用部署。请不要提交真实 `config.yaml`、`.env`、`auths/`、`data/`、`logs/`、数据库、Token、Cookie 或 Codex/Claude/Gemini 等本地配置。
 
-## 赞助商
+## 项目来源
 
-[![https://www.packyapi.com/register?aff=cliproxyapi](./assets/packycode-cn.png)](https://www.packyapi.com/register?aff=cliproxyapi)
+CPA-PLUS 基于以下两个项目整合维护：
 
-感谢 PackyCode 对本项目的赞助！
+- CLIProxyAPI：<https://github.com/router-for-me/CLIProxyAPI>
+- CPA-Manager-Plus：<https://github.com/seakee/CPA-Manager-Plus>
 
-PackyCode 是一家可靠高效的 API 中转服务商，提供 Claude Code、Codex、Gemini 等多种服务的中转。
+本仓库保留原项目能力，并新增单端口集成、Plus 前端嵌入、Plus API、SQLite 持久化、usage collector 和高频上游同步脚本。
 
-PackyCode 为本软件用户提供了特别优惠：使用<a href="https://www.packyapi.com/register?aff=cliproxyapi" target="_blank">此链接</a>注册，并在充值时输入 "cliproxyapi" 优惠码即可享受九折优惠。
+## 功能介绍
 
----
+### CLIProxyAPI 主能力
 
-<table>
-<tbody>
-<tr>
-<td width="180"><a href="https://www.aicodemirror.com/register?invitecode=TJNAIF"><img src="./assets/aicodemirror.png" alt="AICodeMirror" width="150"></a></td>
-<td>感谢 AICodeMirror 赞助了本项目！AICodeMirror 提供 Claude Code / Codex / Gemini CLI 官方高稳定中转服务，支持企业级高并发、极速开票、7×24 专属技术支持。 Claude Code / Codex / Gemini 官方渠道低至 3.8 / 0.2 / 0.9 折，充值更有折上折！AICodeMirror 为 CLIProxyAPI 的用户提供了特别福利，通过<a href="https://www.aicodemirror.com/register?invitecode=TJNAIF" target="_blank">此链接</a>注册的用户，可享受首充8折，企业客户最高可享 7.5 折！</td>
-</tr>
-<tr>
-<td width="180"><a href="https://shop.bmoplus.com/?utm_source=github"><img src="./assets/bmoplus.png" alt="BmoPlus" width="150"></a></td>
-<td>感谢 BmoPlus 赞助了本项目！BmoPlus 是一家专为AI订阅重度用户打造的可靠 AI 账号代充服务商，提供稳定的 ChatGPT Plus / ChatGPT Pro(全程质保) / Claude Pro / Super Grok / Gemini Pro 的官方代充&成品账号。 通过<a href="https://shop.bmoplus.com/?utm_source=github" target="_blank">BmoPlus AI成品号专卖/代充</a>注册下单的用户，可享GPT <b>官网订阅一折</b> 的震撼价格！</td>
-</tr>
-<tr>
-<td width="180"><a href="https://coder.visioncoder.cn"><img src="./assets/visioncoder.png" alt="VisionCoder" width="150"></a></td>
-<td>感谢 <b>VisionCoder</b> 对本项目的支持。<a href="https://coder.visioncoder.cn" target="_blank">VisionCoder 开发平台</a> 是一个可靠高效的 API 中继服务提供商，提供 Claude Code、Codex、Gemini 等主流 AI 模型，帮助开发者和团队更轻松地集成 AI 功能，提升工作效率。
-<p></p>
-VisionCoder 还为我们的用户提供 <a href="https://coder.visioncoder.cn" target="_blank">Token Plan</a> 限时活动：<b>购买 1 个月，赠送 1 个月</b>。</td>
-</tr>
-<tr>
-<td width="180"><a href="https://apikey.fun/register?aff=CLIProxyAPI"><img src="./assets/apikey.png" alt="APIKEY.FUN" width="150"></a></td>
-<td>感谢 APIKEY.FUN 赞助本项目！APIKEY.FUN 是一家专业的企业级 AI 中转站，致力于为企业和个人开发者提供稳定、高效、低成本的 AI 模型 API 接入服务。平台支持 Claude、OpenAI、Gemini 等主流热门模型，价格低至官方原价的 7%。通过本项目<a href="https://apikey.fun/register?aff=CLIProxyAPI">专属链接</a>注册，还可享受最高 <b>充值永久 95 折</b> 专属优惠。</td>
-</tr>
-<tr>
-<td width="180"><a href="https://runapi.co/register?aff=FivD"><img src="./assets/runapi.png" alt="RunAPI" width="150"></a></td>
-<td>RunAPI 是高效稳定的API OpenRouter平替平台，一个 API Key 即可访问 OpenAI、Claude、Gemini、DeepSeek、Grok 等 150+ 主流模型，低至 1 折，极其稳定，可以无缝兼容 Claude Code、OpenClaw 等工具。RunAPI 为 CPA的用户提供专属福利：<a href="https://runapi.co/register?aff=FivD">注册</a>联系管理员即可领取￥7的免费额度</td>
-</tr>
-</tbody>
-</table>
+- OpenAI / Gemini / Claude / Codex / Grok 兼容 API 代理
+- OAuth 登录与多账号轮询
+- OpenAI-compatible 上游配置
+- 流式、非流式、多模态、工具调用等能力
+- Management API 与本地配置热更新能力
 
+### CPA-PLUS 集成能力
 
-## 功能特性
+- 内置完整 Plus 管理面板：`/management.html`
+- Plus API 统一挂载：`/v0/management/plus/*`
+- 共用 CLIProxyAPI 管理密钥：`remote-management.secret-key`
+- SQLite 持久化：默认 `./data/usage.sqlite`
+- 请求监控、用量统计、失败请求、延迟、模型、账号/渠道维度分析
+- usage 导入/导出
+- API key alias 管理
+- 模型价格管理与 LiteLLM 价格同步
+- 内置 usage collector，随主服务启动/停止
+- Docker 构建时自动打包 Plus 前端到 Go 服务中
 
-- 为 CLI 模型提供 OpenAI/Gemini/Claude/Codex/Grok 兼容的 API 端点
-- 新增 OpenAI Codex（GPT 系列）支持（OAuth 登录）
-- 新增 Claude Code 支持（OAuth 登录）
-- 新增 Grok Build 支持（OAuth 登录）
-- 支持流式、非流式响应，以及受支持场景下的 WebSocket 响应
-- 函数调用/工具支持
-- 多模态输入（文本、图片）
-- 多账户支持与轮询负载均衡（Gemini、OpenAI、Claude、Grok）
-- 简单的 CLI 身份验证流程（Gemini、OpenAI、Claude、Grok）
-- 支持 Gemini AIStudio API 密钥
-- 支持 AI Studio Build 多账户轮询
-- 支持 Gemini CLI 多账户轮询
-- 支持 Claude Code 多账户轮询
-- 支持 OpenAI Codex 多账户轮询
-- 支持 Grok Build 多账户轮询
-- 通过配置接入上游 OpenAI 兼容提供商（例如 OpenRouter）
-- 可复用的 Go SDK（见 `docs/sdk-usage_CN.md`）
+## 快速运行
 
-## 新手入门
+### 1. 准备配置
 
-CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
+```bash
+cp config.example.yaml config.yaml
+```
 
-## 管理 API 文档
+至少修改：
 
-请参见 [MANAGEMENT_API_CN.md](https://help.router-for.me/cn/management/api)
+```yaml
+port: 8317
 
-## 使用量统计
+remote-management:
+  allow-remote: true
+  secret-key: "请改成你自己的强密码"
 
-自v6.10.0版本以后，CLIProxyAPI及 [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) 项目不再预置数据统计功能，如果有数据统计需求的请使用以下项目：
+plus-manager:
+  enabled: true
+  data-dir: ./data
+  db-path: ./data/usage.sqlite
+  collector-enabled: true
+  collector-mode: auto
+  poll-interval-ms: 1000
+```
 
-### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
+如果只允许本机访问管理端，可设置：
 
-独立的 CLIProxyAPI 使用量持久化与可视化服务，定期同步 CLIProxyAPI 数据，存储到 SQLite，提供聚合 API，并内置使用量分析与统计仪表盘。
+```yaml
+remote-management:
+  allow-remote: false
+```
 
-### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
+### 2. 启动 Docker
 
-面向 CLIProxyAPI 的完整管理中心，提供请求级监控和费用预估。CPA-Manager 可按账号、模型、渠道、延迟、状态和 token 用量追踪采集到的请求；支持可编辑模型价格与一键同步 LiteLLM 价格来估算费用；用 SQLite 持久化事件；并提供面向 Codex 账号池的批量巡检、配额识别、异常账号定位、清理建议与一键执行能力，适合多账号池的日常运维管理。
+```bash
+docker compose up -d --build
+```
 
-CPA-PLUS 集成构建的单端口入口为 `http://host:8317/management.html`，共用一个 `remote-management.secret-key`，Plus 数据默认持久化到 `./data/usage.sqlite`。集成版已内置 Plus 面板，并接入 SQLite 请求监控、usage 导入/导出、API key 别名、dashboard analytics、模型价格与 LiteLLM 同步，以及进程内 usage collector。见 [CPA-PLUS 集成部署说明](docs/cpa-plus-integrated.md)。
+默认挂载：
 
-## SDK 文档
+```text
+./config.yaml -> /CLIProxyAPI/config.yaml
+./auths       -> /root/.cli-proxy-api
+./logs        -> /CLIProxyAPI/logs
+./data        -> /CLIProxyAPI/data
+```
 
-- 使用文档：[docs/sdk-usage_CN.md](docs/sdk-usage_CN.md)
-- 高级（执行器与翻译器）：[docs/sdk-advanced_CN.md](docs/sdk-advanced_CN.md)
-- 认证: [docs/sdk-access_CN.md](docs/sdk-access_CN.md)
-- 凭据加载/更新: [docs/sdk-watcher_CN.md](docs/sdk-watcher_CN.md)
-- 自定义 Provider 示例：`examples/custom-provider`
+### 3. 访问面板
 
-## 贡献
+```text
+http://host:8317/management.html
+```
 
-欢迎贡献！请随时提交 Pull Request。
+登录时使用 `config.yaml` 中的：
 
-1. Fork 仓库
-2. 创建您的功能分支（`git checkout -b feature/amazing-feature`）
-3. 提交您的更改（`git commit -m 'Add some amazing feature'`）
-4. 推送到分支（`git push origin feature/amazing-feature`）
-5. 打开 Pull Request
+```text
+remote-management.secret-key
+```
 
-## 谁与我们在一起？
+### 4. API 调用
 
-这些项目基于 CLIProxyAPI:
+主 API 与原 CLIProxyAPI 保持一致，基础地址为：
 
-### [vibeproxy](https://github.com/automazeio/vibeproxy)
+```text
+http://host:8317
+```
 
-一个原生 macOS 菜单栏应用，让您可以使用 Claude Code & ChatGPT 订阅服务和 AI 编程工具，无需 API 密钥。
+Plus 集成接口在：
 
-### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
+```text
+/v0/management/plus/*
+```
 
-一款跨平台的桌面和 Web 应用程序，可通过 CLIProxyAPI 使用您现有的 LLM 订阅（Gemini、ChatGPT、Claude, etc.）来翻译和验证 SRT 字幕 - 无需 API 密钥。
+## 常用运维命令
 
-### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
+启动/重建：
 
-CLI 封装器，用于通过 CLIProxyAPI OAuth 即时切换多个 Claude 账户和替代模型（Gemini, Codex, Antigravity），无需 API 密钥。
+```bash
+docker compose up -d --build
+```
 
-### [Quotio](https://github.com/nguyenphutrong/quotio)
+查看容器：
 
-原生 macOS 菜单栏应用，统一管理 Claude、Gemini、OpenAI 和 Antigravity 订阅，提供实时配额追踪和智能自动故障转移，支持 Claude Code、OpenCode 和 Droid 等 AI 编程工具，无需 API 密钥。
+```bash
+docker compose ps
+```
 
-### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
+查看日志：
 
-原生 Windows CLIProxyAPI 分支，集成 TUI、系统托盘及多服务商 OAuth 认证，专为 AI 编程工具打造，无需 API 密钥。
+```bash
+docker compose logs -f cli-proxy-api
+```
 
-### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
+停止：
 
-一款 VSCode 扩展，提供了在 VSCode 中快速切换 Claude Code 模型的功能，内置 CLIProxyAPI 作为其后端，支持后台自动启动和关闭。
+```bash
+docker compose down
+```
 
-### [ZeroLimit](https://github.com/0xtbug/zero-limit)
+重启：
 
-Windows 桌面应用，基于 Tauri + React 构建，用于通过 CLIProxyAPI 监控 AI 编程助手配额。支持跨 Gemini、Claude、OpenAI Codex 和 Antigravity 账户的使用量追踪，提供实时仪表盘、系统托盘集成和一键代理控制，无需 API 密钥。
+```bash
+docker compose restart cli-proxy-api
+```
 
-### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
+## 数据、备份与恢复
 
-面向 CLIProxyAPI 的 Web 管理面板，提供健康检查、资源监控、日志查看、自动更新、请求统计与定价展示，支持一键安装与 systemd 服务。
+建议重点备份：
 
-### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
+```text
+config.yaml
+.env                         # 如果你实际使用了 .env
+auths/
+data/usage.sqlite
+```
 
-Windows 托盘应用，基于 PowerShell 脚本实现，不依赖任何第三方库。主要功能包括：自动创建快捷方式、静默运行、密码管理、通道切换（Main / Plus）以及自动下载与更新。
+备份示例：
 
-### [霖君](https://github.com/wangdabaoqq/LinJun)
+```bash
+mkdir -p backups
+cp config.yaml backups/config.yaml.$(date +%Y%m%d%H%M%S)
+tar -czf backups/auths.$(date +%Y%m%d%H%M%S).tgz auths
+tar -czf backups/data.$(date +%Y%m%d%H%M%S).tgz data
+```
 
-霖君是一款用于管理AI编程助手的跨平台桌面应用，支持macOS、Windows、Linux系统。统一管理Claude Code、Gemini CLI、OpenAI Codex等AI编程工具，本地代理实现多账户配额跟踪和一键配置。
+恢复时停止容器，替换对应文件/目录，再重新启动：
 
-### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
+```bash
+docker compose down
+# restore config.yaml auths/ data/
+docker compose up -d --build
+```
 
-一个面向 CLIProxyAPI 的现代化 Web 管理仪表盘，基于 Next.js、React 和 PostgreSQL 构建。支持实时日志流、结构化配置编辑、API Key 管理、Claude/Gemini/Codex 的 OAuth 提供方集成、使用量分析、容器管理，并可通过配套插件与 OpenCode 同步配置，无需手动编辑 YAML。
+## 高频上游同步方案
 
-### [All API Hub](https://github.com/qixing-jk/all-api-hub)
+本项目包含本地同步脚本，用于快速吸收两个上游项目更新。
 
-用于一站式管理 New API 兼容中转站账号的浏览器扩展，提供余额与用量看板、自动签到、密钥一键导出到常用应用、网页内 API 可用性测试，以及渠道与模型同步和重定向。支持通过 CLIProxyAPI Management API 一键导入 Provider 与同步配置。
+一键同步两个上游：
 
-### [Shadow AI](https://github.com/HEUDavid/shadow-ai)
+```bash
+./scripts/local-update-all.sh
+```
 
-Shadow AI 是一款专为受限环境设计的 AI 辅助工具。提供无窗口、无痕迹的隐蔽运行方式，并通过局域网实现跨设备的 AI 问答交互与控制。本质上是一个「屏幕/音频采集 + AI 推理 + 低摩擦投送」的自动化协作层，帮助用户在受控设备/受限环境下沉浸式跨应用地使用 AI 助手。
+只同步 CLIProxyAPI：
 
-### [ProxyPal](https://github.com/buddingnewinsights/proxypal)
+```bash
+./scripts/local-update-cli.sh
+```
 
-跨平台桌面应用（macOS、Windows、Linux），以原生 GUI 封装 CLIProxyAPI。支持连接 Claude、ChatGPT、Gemini、GitHub Copilot 及自定义 OpenAI 兼容端点，具备使用分析、请求监控和热门编程工具自动配置功能，无需 API 密钥。
+只同步 CPA-Manager-Plus 前端：
 
-### [CLIProxyAPI Quota Inspector](https://github.com/AllenReder/CLIProxyAPI-Quota-Inspector)
+```bash
+./scripts/local-update-plus-web.sh
+```
 
-上手即用的面向 CLIProxyAPI 跨平台配额查询工具，支持按账号展示 codex 5h/7d 配额窗口、按计划排序、状态着色及多账号汇总分析。
+同步后建议检查并提交：
 
-### [CLIProxy Pool Watch](https://github.com/murasame612/CLIProxyPoolWidget)
+```bash
+git status --short
+git diff --stat
+git add README.md README_CN.md Dockerfile config.example.yaml docker-compose.yml internal web scripts docs
+git commit -m "chore: sync upstream updates"
+docker compose up -d --build
+```
 
-原生 macOS SwiftUI 应用，用于监控 CLIProxyAPI 池中的 ChatGPT/Codex 账号额度。通过 Management API 展示账号可用状态、Plus 基准容量、5 小时与周额度进度条、套餐权重和恢复预测。
+不要使用 `git add .`，避免误提交隐私文件。
 
-### [Panopticon](https://github.com/eltmon/panopticon-cli)
+详细流程见：
 
-面向 AI 编程助手的多智能体编排工具。它将 CLIProxyAPI 作为本地 sidecar 运行，使其智能体可以通过 ChatGPT 订阅驱动 GPT 模型，并将 Claude Code 指向 Anthropic 兼容端点，无需 OpenAI API 密钥。
+- `docs/local-upstream-sync.md`
+- `docs/cpa-plus-work-log-and-maintenance.md`
 
-### [Tunnel Agent](https://github.com/Villoh/tunnel-agent)
+## 隐私安全清单
 
-Windows 桌面 UI，通过单一界面管理 CLIProxyAPI 和 Perplexity WebUI Scraper，灵感来自 Quotio 和 VibeProxy。连接 OAuth 提供商（Claude、Gemini CLI、Codex、Kimi、Antigravity）、自定义 API 密钥和 Perplexity 会话账号，然后将任意编程智能体指向本地端点。
+这些内容不要提交到 GitHub：
 
-> [!NOTE]  
-> 如果你开发了基于 CLIProxyAPI 的项目，请提交一个 PR（拉取请求）将其添加到此列表中。
+```text
+config.yaml
+.env
+.env.*.local
+auths/                 # 只保留 auths/.gitkeep
+data/
+logs/
+*.sqlite
+*.db
+*.key
+*.pem
+.codex/
+.claude/
+.gemini/
+```
 
-## 更多选择
+提交前建议执行：
 
-以下项目是 CLIProxyAPI 的移植版或受其启发：
+```bash
+git status --short
+git diff --cached --name-only
+```
 
-### [9Router](https://github.com/decolua/9router)
+如需发布到私有仓库，建议使用无历史快照方式，而不是直接推送包含旧历史的完整仓库。
 
-基于 Next.js 的实现，灵感来自 CLIProxyAPI，易于安装使用；自研格式转换（OpenAI/Claude/Gemini/Ollama）、组合系统与自动回退、多账户管理（指数退避）、Next.js Web 控制台，并支持 Cursor、Claude Code、Cline、RooCode 等 CLI 工具，无需 API 密钥。
+## 重要文档
 
-### [OmniRoute](https://github.com/diegosouzapw/OmniRoute)
+- 整合部署说明：`docs/cpa-plus-integrated.md`
+- 工作日志、功能说明与维护文档：`docs/cpa-plus-work-log-and-maintenance.md`
+- 本地上游同步流程：`docs/local-upstream-sync.md`
+- SDK 使用：`docs/sdk-usage.md`
+- SDK 进阶：`docs/sdk-advanced.md`
+- SDK 访问控制：`docs/sdk-access.md`
+- SDK Watcher：`docs/sdk-watcher.md`
 
-代码不止，创新不停。智能路由至免费及低成本 AI 模型，并支持自动故障转移。
+## 本仓库维护原则
 
-OmniRoute 是一个面向多供应商大语言模型的 AI 网关：它提供兼容 OpenAI 的端点，具备智能路由、负载均衡、重试及回退机制。通过添加策略、速率限制、缓存和可观测性，确保推理过程既可靠又具备成本意识。
+- 本地运行优先，私有仓库只保存可公开给自己的源码快照
+- 上游同步优先使用脚本，不手工大范围复制
+- 每次同步后先测试/构建，再部署
+- 推送前先检查敏感文件和 staged 文件
+- 保留 `cli-upstream` / `plus-upstream` 为只拉取远程，禁止误推上游
 
-### [Playful Proxy API Panel (PPAP)](https://github.com/daishuge/playful-proxy-api-panel)
+## License
 
-一个公开的 CLIProxyAPI 兼容二开版本和配套管理面板，尽量保持与上游一致的使用方式，同时恢复内置使用量统计，并补充缓存命中率、首字响应时间、TPS 记录和面向 Docker 自托管的安装说明。
-
-### [Codex Switch](https://github.com/9ycrooked/CodexSwitch)
-
-这是一个使用 Tauri 2 + Vue 3 构建的工具，用于管理多个 OpenAI Codex 桌面账户。它可以在已保存的 ChatGPT/Codex 认证配置之间切换，实时查看 5 小时和每周配额使用情况，验证 token 健康状态，查看当前账户详情，并在无需手动复制的情况下导入或保存 auth.json 文件。
-
-> [!NOTE]  
-> 如果你开发了 CLIProxyAPI 的移植或衍生项目，请提交 PR 将其添加到此列表中。
-
-## 许可证
-
-此项目根据 MIT 许可证授权 - 有关详细信息，请参阅 [LICENSE](LICENSE) 文件。
-
-## 写给所有中国网友的
-
-QQ 群：188637136（满）、1081218164
-
-或
-
-Telegram 群：https://t.me/CLIProxyAPI
+本仓库基于原 CLIProxyAPI 与 CPA-Manager-Plus 改造维护，相关许可请参考仓库中的 `LICENSE` 以及对应上游项目许可。
