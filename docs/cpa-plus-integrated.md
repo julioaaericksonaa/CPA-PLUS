@@ -6,12 +6,13 @@ process and exposes integrated Plus extension APIs on the same `8317` port.
 Current implementation status:
 
 - Included: bundled Plus panel, unified CPA management-key login, integrated
-  `/usage-service/info` detection, Plus status endpoints, and SQLite-backed
-  model price persistence.
-- In progress: request monitoring, usage import/export, API-key aliases,
-  dashboard analytics, collector lifecycle, and server-side Codex inspection.
-  Those Plus pages may still show unavailable states until their corresponding
-  `/v0/management/plus/*` backends are ported.
+  `/usage-service/info` and `/usage-service/config` detection, Plus status
+  endpoints, SQLite-backed model prices and LiteLLM sync, API-key aliases,
+  request usage storage, usage import/export, dashboard summary, monitoring
+  analytics, and the in-process usage collector lifecycle.
+- The Plus pages use the same `remote-management.secret-key` and call
+  `/v0/management/plus/*` APIs on the same origin/port. Server-side Codex
+  inspection remains separate from the core CPA-PLUS monitoring flow.
 
 ## Access
 
@@ -37,8 +38,8 @@ Mount both auth and Plus data:
 -v ./data:/CLIProxyAPI/data
 ```
 
-Integrated Plus data is stored in `./data/usage.sqlite` by default. At this
-stage the database is used for model price persistence; usage statistics will
-use the same data path when the collector and usage-event store are ported.
+Integrated Plus data is stored in `./data/usage.sqlite` by default. The same
+SQLite database stores model prices, API-key aliases, and collected usage
+events consumed by the Plus monitoring/dashboard pages.
 
 With Docker Compose, the Plus data path is controlled by `CLI_PROXY_PLUS_DATA_PATH` and defaults to `./data` on the host.
