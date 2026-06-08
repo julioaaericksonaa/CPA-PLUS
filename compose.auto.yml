@@ -1,0 +1,14 @@
+services:
+  cpa-plus:
+    image: ${CPA_PLUS_IMAGE:-cpa-plus:auto}
+    container_name: cpa-plus
+    environment:
+      DEPLOY: ${DEPLOY:-}
+    ports:
+      - "${CPA_PLUS_PORT:-8317}:8317"
+    volumes:
+      - ${CLI_PROXY_CONFIG_PATH:-./config.yaml}:/CLIProxyAPI/config.yaml
+      - ${CLI_PROXY_AUTH_PATH:-./auths}:/root/.cli-proxy-api
+      - ${CLI_PROXY_LOG_PATH:-./logs}:/CLIProxyAPI/logs
+      - ${CLI_PROXY_PLUS_DATA_PATH:-./data}:/CLIProxyAPI/data
+    restart: unless-stopped

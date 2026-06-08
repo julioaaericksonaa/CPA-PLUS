@@ -1,233 +1,147 @@
-# CPA-PLUS
+# CPA-PLUS Auto Branch
 
-CPA-PLUS 是一个本地维护的 **CLIProxyAPI + CPA-Manager-Plus 整合版**。
+这个 `auto` 分支采用 **CLIProxyAPI-Pro 风格的 patch/overlay 维护方式**：
 
-它把 CLI Proxy API 主服务、完整 Plus Web 管理面板、请求统计持久化与 Plus 扩展 API 合并到同一个项目中，目标是减少部署和维护成本：
+- 不在分支里保存完整 CLIProxyAPI 源码。
+- 不在分支里保存完整 CPA-Manager-Plus 前端源码。
+- 只保存 CPA-PLUS 自己的补丁、前端适配脚本、构建脚本和部署文件。
+- 构建时自动拉取两个上游，应用补丁，生成完整可运行源码，再构建 Docker 镜像。
 
-- 一个项目
-- 一个 Docker 镜像/容器
-- 一个端口：`8317`
-- 一个入口：`http://host:8317/management.html`
-- 一个管理密钥：`remote-management.secret-key`
-
-> 本仓库适合私有自用部署。请不要提交真实 `config.yaml`、`.env`、`auths/`、`data/`、`logs/`、数据库、Token、Cookie 或 Codex/Claude/Gemini 等本地配置。
-
-## 项目来源
-
-CPA-PLUS 基于以下两个项目整合维护：
-
-- CLIProxyAPI：<https://github.com/router-for-me/CLIProxyAPI>
-- CPA-Manager-Plus：<https://github.com/seakee/CPA-Manager-Plus>
-
-本仓库保留原项目能力，并新增单端口集成、Plus 前端嵌入、Plus API、SQLite 持久化、usage collector 和高频上游同步脚本。
-
-## 功能介绍
-
-### CLIProxyAPI 主能力
-
-- OpenAI / Gemini / Claude / Codex / Grok 兼容 API 代理
-- OAuth 登录与多账号轮询
-- OpenAI-compatible 上游配置
-- 流式、非流式、多模态、工具调用等能力
-- Management API 与本地配置热更新能力
-
-### CPA-PLUS 集成能力
-
-- 内置完整 Plus 管理面板：`/management.html`
-- Plus API 统一挂载：`/v0/management/plus/*`
-- 共用 CLIProxyAPI 管理密钥：`remote-management.secret-key`
-- SQLite 持久化：默认 `./data/usage.sqlite`
-- 请求监控、用量统计、失败请求、延迟、模型、账号/渠道维度分析
-- usage 导入/导出
-- API key alias 管理
-- 模型价格管理与 LiteLLM 价格同步
-- 内置 usage collector，随主服务启动/停止
-- Docker 构建时自动打包 Plus 前端到 Go 服务中
-
-## 快速运行
-
-### 1. 准备配置
-
-```bash
-cp config.example.yaml config.yaml
-```
-
-至少修改：
-
-```yaml
-port: 8317
-
-remote-management:
-  allow-remote: true
-  secret-key: "请改成你自己的强密码"
-
-plus-manager:
-  enabled: true
-  data-dir: ./data
-  db-path: ./data/usage.sqlite
-  collector-enabled: true
-  collector-mode: auto
-  poll-interval-ms: 1000
-```
-
-如果只允许本机访问管理端，可设置：
-
-```yaml
-remote-management:
-  allow-remote: false
-```
-
-### 2. 启动 Docker
-
-```bash
-docker compose up -d --build
-```
-
-默认挂载：
+最终运行形态仍然是：
 
 ```text
-./config.yaml -> /CLIProxyAPI/config.yaml
-./auths       -> /root/.cli-proxy-api
-./logs        -> /CLIProxyAPI/logs
-./data        -> /CLIProxyAPI/data
+单 Docker
+单端口 8317
+完整 Plus 面板：http://host:8317/management.html
+Plus API：/v0/management/plus/*
 ```
 
-### 3. 访问面板
+## 目录说明
+
+```text
+patches/cliproxyapi/0001-cpa-plus-integration.patch
+  CPA-PLUS 后端、Dockerfile、配置、README、Plus API、SQLite store、collector 等核心补丁。
+
+cpa-plus-web/patch-plus-web-integrated.py
+  将上游 CPA-Manager-Plus 前端改成单端口 integrated API 路径。
+
+cpa-plus-core/prepare-source.sh
+  拉取两个上游并生成完整 CPA-PLUS 源码。
+
+cpa-plus-core/build-docker.sh
+  生成源码并构建 Docker 镜像。
+
+scripts/install-auto.sh
+  首次安装：构建镜像、生成 config.yaml、启动 compose。
+
+scripts/update-auto.sh
+  后续更新：重新拉取上游、应用补丁、构建镜像、重启容器。
+
+compose.auto.yml
+  auto 分支运行用 Docker Compose 文件。
+```
+
+## 首次安装
+
+```bash
+git clone -b auto https://github.com/julioaaericksonaa/CPA-PLUS.git CPA-PLUS-auto
+cd CPA-PLUS-auto
+./scripts/install-auto.sh
+```
+
+脚本会：
+
+1. 拉取 `router-for-me/CLIProxyAPI`。
+2. 拉取 `seakee/CPA-Manager-Plus`。
+3. 应用 CPA-PLUS core patch。
+4. 同步 Plus 前端到 `web/manager-plus`。
+5. 自动改写前端 API 路径为 `/v0/management/plus/*`。
+6. 构建本地镜像 `cpa-plus:auto`。
+7. 如果没有 `config.yaml`，自动从生成的 `config.example.yaml` 复制一份。
+8. 使用 `compose.auto.yml` 启动容器。
+
+首次启动后请修改：
+
+```yaml
+remote-management:
+  allow-remote: true
+  secret-key: "换成你自己的强密码"
+```
+
+然后重启：
+
+```bash
+docker compose -f compose.auto.yml restart cpa-plus
+```
+
+访问：
 
 ```text
 http://host:8317/management.html
 ```
 
-登录时使用 `config.yaml` 中的：
+## 后续更新
+
+同步两个上游并重建：
+
+```bash
+./scripts/update-auto.sh
+```
+
+指定上游版本：
+
+```bash
+./scripts/update-auto.sh --cli-ref v7.1.54 --plus-ref main
+```
+
+只准备源码，不构建 Docker：
+
+```bash
+./cpa-plus-core/prepare-source.sh --skip-tests
+```
+
+生成后的完整源码位置：
 
 ```text
-remote-management.secret-key
+.build/out/CLIProxyAPI
 ```
 
-### 4. API 调用
-
-主 API 与原 CLIProxyAPI 保持一致，基础地址为：
-
-```text
-http://host:8317
-```
-
-Plus 集成接口在：
-
-```text
-/v0/management/plus/*
-```
-
-## 常用运维命令
-
-启动/重建：
+如果想手动检查生成结果：
 
 ```bash
-docker compose up -d --build
-```
-
-查看容器：
-
-```bash
-docker compose ps
-```
-
-查看日志：
-
-```bash
-docker compose logs -f cli-proxy-api
-```
-
-停止：
-
-```bash
-docker compose down
-```
-
-重启：
-
-```bash
-docker compose restart cli-proxy-api
-```
-
-## 数据、备份与恢复
-
-建议重点备份：
-
-```text
-config.yaml
-.env                         # 如果你实际使用了 .env
-auths/
-data/usage.sqlite
-```
-
-备份示例：
-
-```bash
-mkdir -p backups
-cp config.yaml backups/config.yaml.$(date +%Y%m%d%H%M%S)
-tar -czf backups/auths.$(date +%Y%m%d%H%M%S).tgz auths
-tar -czf backups/data.$(date +%Y%m%d%H%M%S).tgz data
-```
-
-恢复时停止容器，替换对应文件/目录，再重新启动：
-
-```bash
-docker compose down
-# restore config.yaml auths/ data/
-docker compose up -d --build
-```
-
-## 高频上游同步方案
-
-本项目包含本地同步脚本，用于快速吸收两个上游项目更新。
-
-一键同步两个上游：
-
-```bash
-./scripts/local-update-all.sh
-```
-
-只同步 CLIProxyAPI：
-
-```bash
-./scripts/local-update-cli.sh
-```
-
-只同步 CPA-Manager-Plus 前端：
-
-```bash
-./scripts/local-update-plus-web.sh
-```
-
-同步后建议检查并提交：
-
-```bash
+cd .build/out/CLIProxyAPI
 git status --short
-git diff --stat
-git add README.md README_CN.md Dockerfile config.example.yaml docker-compose.yml internal web scripts docs
-git commit -m "chore: sync upstream updates"
-docker compose up -d --build
+go test ./internal/config ./internal/managementasset ./internal/plusmanager/... ./internal/api ./internal/safemode -count=1
+docker build -t cpa-plus:auto .
 ```
 
-不要使用 `git add .`，避免误提交隐私文件。
+## 更新 CPA-PLUS 自身补丁
 
-详细流程见：
+如果你在 `main` 完整源码分支继续开发了 CPA-PLUS 功能，可以回到本分支重新生成 core patch：
 
-- `docs/local-upstream-sync.md`
-- `docs/cpa-plus-work-log-and-maintenance.md`
+```bash
+./scripts/regenerate-core-patch.sh /root/code/cpa-plus-merge-study/CLIProxyAPI cli-upstream/main
+```
 
-## 隐私安全清单
+然后验证：
 
-这些内容不要提交到 GitHub：
+```bash
+./cpa-plus-core/prepare-source.sh --skip-tests
+```
+
+确认没问题后提交 `auto` 分支。
+
+## 隐私安全
+
+不要提交这些内容：
 
 ```text
 config.yaml
 .env
-.env.*.local
-auths/                 # 只保留 auths/.gitkeep
+auths/  # 除 auths/.gitkeep
 data/
 logs/
+.build/
 *.sqlite
 *.db
 *.key
@@ -237,33 +151,23 @@ logs/
 .gemini/
 ```
 
-提交前建议执行：
+提交前检查：
 
 ```bash
 git status --short
 git diff --cached --name-only
 ```
 
-如需发布到私有仓库，建议使用无历史快照方式，而不是直接推送包含旧历史的完整仓库。
+## 和 main 分支的区别
 
-## 重要文档
+```text
+main 分支：完整源码整合版，适合直接开发和调试。
+auto 分支：patch/overlay 自动构建版，适合高频同步上游和自动发布。
+```
 
-- 整合部署说明：`docs/cpa-plus-integrated.md`
-- 工作日志、功能说明与维护文档：`docs/cpa-plus-work-log-and-maintenance.md`
-- 本地上游同步流程：`docs/local-upstream-sync.md`
-- SDK 使用：`docs/sdk-usage.md`
-- SDK 进阶：`docs/sdk-advanced.md`
-- SDK 访问控制：`docs/sdk-access.md`
-- SDK Watcher：`docs/sdk-watcher.md`
+建议维护方式：
 
-## 本仓库维护原则
-
-- 本地运行优先，私有仓库只保存可公开给自己的源码快照
-- 上游同步优先使用脚本，不手工大范围复制
-- 每次同步后先测试/构建，再部署
-- 推送前先检查敏感文件和 staged 文件
-- 保留 `cli-upstream` / `plus-upstream` 为只拉取远程，禁止误推上游
-
-## License
-
-本仓库基于原 CLIProxyAPI 与 CPA-Manager-Plus 改造维护，相关许可请参考仓库中的 `LICENSE` 以及对应上游项目许可。
+1. 平时部署/更新用 `auto` 分支。
+2. 需要开发新功能时在 `main` 分支改。
+3. main 验证通过后，用 `scripts/regenerate-core-patch.sh` 刷新 auto 分支补丁。
+4. auto 分支跑 `prepare-source.sh` / `build-docker.sh` 验证。

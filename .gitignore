@@ -1,59 +1,30 @@
-# Binaries
-cli-proxy-api
-*.exe
+# Auto branch generated workspaces
+.build/
+dist/
+.cache/
 
-# Configuration
+# Local config and runtime data
 config.yaml
 .env
-
-# Generated content
-bin/*
-logs/*
-conv/*
-temp/*
-refs/*
-plugins/*
-examples/plugin/bin/*
-
-# Storage backends
-pgstore/*
-gitstore/*
-objectstore/*
-
-# Static assets
-static/*
-
-# Authentication data
+.env.*.local
 auths/*
 !auths/.gitkeep
+data/
+logs/
+*.sqlite
+*.db
 
-# Documentation
-docs/*
-AGENTS.md
-CLAUDE.md
-GEMINI.md
+# Local credentials/tooling
+.codex/
+.claude/
+.gemini/
+.ssh/
+*.key
+*.pem
 
-# Tooling metadata
-.vscode/*
-.worktrees/
-.codex/*
-.claude/*
-.gemini/*
-.serena/*
-.agent/*
-.agents/*
-.opencode/*
-.idea/*
-.beads/*
-.bmad/*
-_bmad/*
-_bmad-output/*
-
-# macOS
+# OS/editor
 .DS_Store
-._*
-.gocache/
-
-# Python cache
+.idea/
+.vscode/
 __pycache__/
 *.py[cod]
