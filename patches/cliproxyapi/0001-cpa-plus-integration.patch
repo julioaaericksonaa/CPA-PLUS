@@ -54,47 +54,54 @@ index a24a8d61..95b903a4 100644
  FROM debian:bookworm
  
 diff --git a/README.md b/README.md
-index c6a0178b..268a32bf 100644
+index c6a0178b..1a1f8be7 100644
 --- a/README.md
 +++ b/README.md
-@@ -1,218 +1,269 @@
+@@ -1,218 +1,170 @@
 -# CLI Proxy API
-+# CPA-PLUS
++# CPA-PLUS Docker Branch
  
 -English | [中文](README_CN.md) | [日本語](README_JA.md)
-+CPA-PLUS 是一个本地维护的 **CLIProxyAPI + CPA-Manager-Plus 整合版**。
++`main` 分支是 CPA-PLUS 的 **Docker 部署维护分支**。
  
 -A proxy server that provides OpenAI/Gemini/Claude/Codex/Grok compatible API interfaces for CLI.
-+它把 CLI Proxy API 主服务、完整 Plus Web 管理面板、请求统计持久化与 Plus 扩展 API 合并到同一个项目中，目标是减少部署和维护成本：
++它维护完整源码整合版：CLIProxyAPI 主服务、CPA-Manager-Plus 面板、Plus API、SQLite 请求统计和 usage collector 都打包进同一个 Docker 镜像。
  
 -It now also supports OpenAI Codex (GPT models) and Claude Code via OAuth.
++## 分支定位
+ 
+-So you can use local or multi-account CLI access with OpenAI(include Responses)/Gemini/Claude-compatible clients and SDKs.
++```text
++main  = Docker 项目分支，适合容器部署和源码构建
++linux = Linux 二进制项目分支，适合直接运行二进制
++```
+ 
+-## Sponsor
++本分支目标：
+ 
+-[![https://www.packyapi.com/register?aff=cliproxyapi](./assets/packycode-en.png)](https://www.packyapi.com/register?aff=cliproxyapi)
 +- 一个项目
 +- 一个 Docker 镜像/容器
 +- 一个端口：`8317`
 +- 一个入口：`http://host:8317/management.html`
 +- 一个管理密钥：`remote-management.secret-key`
  
--So you can use local or multi-account CLI access with OpenAI(include Responses)/Gemini/Claude-compatible clients and SDKs.
-+> 本仓库适合私有自用部署。请不要提交真实 `config.yaml`、`.env`、`auths/`、`data/`、`logs/`、数据库、Token、Cookie 或 Codex/Claude/Gemini 等本地配置。
- 
--## Sponsor
-+## 项目来源
- 
--[![https://www.packyapi.com/register?aff=cliproxyapi](./assets/packycode-en.png)](https://www.packyapi.com/register?aff=cliproxyapi)
-+CPA-PLUS 基于以下两个项目整合维护：
- 
 -Thanks to PackyCode for sponsoring this project!
-+- CLIProxyAPI：<https://github.com/router-for-me/CLIProxyAPI>
-+- CPA-Manager-Plus：<https://github.com/seakee/CPA-Manager-Plus>
++## 快速运行 Docker
  
 -PackyCode is a reliable and efficient API relay service provider, offering relay services for Claude Code, Codex, Gemini, and more.
-+本仓库保留原项目能力，并新增单端口集成、Plus 前端嵌入、Plus API、SQLite 持久化、usage collector 和高频上游同步脚本。
++```bash
++git clone -b main https://github.com/julioaaericksonaa/CPA-PLUS.git
++cd CPA-PLUS
++cp config.example.yaml config.yaml
++```
  
 -PackyCode provides special discounts for our software users: register using <a href="https://www.packyapi.com/register?aff=cliproxyapi">this link</a> and enter the "cliproxyapi" promo code during recharge to get 10% off.
-+## 功能介绍
++编辑 `config.yaml`：
  
 ----
-+### CLIProxyAPI 主能力
++```yaml
++port: 8317
  
 -<table>
 -<tbody>
@@ -122,14 +129,17 @@ index c6a0178b..268a32bf 100644
 -</tr>
 -</tbody>
 -</table>
-+- OpenAI / Gemini / Claude / Codex / Grok 兼容 API 代理
-+- OAuth 登录与多账号轮询
-+- OpenAI-compatible 上游配置
-+- 流式、非流式、多模态、工具调用等能力
-+- Management API 与本地配置热更新能力
++remote-management:
++  allow-remote: true
++  secret-key: "换成你自己的强密码"
  
 -## Overview
-+### CPA-PLUS 集成能力
++plus-manager:
++  enabled: true
++  data-dir: ./data
++  db-path: ./data/usage.sqlite
++  collector-enabled: true
++```
  
 -- OpenAI/Gemini/Claude/Grok compatible API endpoints for CLI models
 -- OpenAI Codex support (GPT models) via OAuth login
@@ -149,61 +159,48 @@ index c6a0178b..268a32bf 100644
 -- Grok Build multi-account load balancing
 -- OpenAI-compatible upstream providers via config (e.g., OpenRouter)
 -- Reusable Go SDK for embedding the proxy (see `docs/sdk-usage.md`)
-+- 内置完整 Plus 管理面板：`/management.html`
-+- Plus API 统一挂载：`/v0/management/plus/*`
-+- 共用 CLIProxyAPI 管理密钥：`remote-management.secret-key`
-+- SQLite 持久化：默认 `./data/usage.sqlite`
-+- 请求监控、用量统计、失败请求、延迟、模型、账号/渠道维度分析
-+- usage 导入/导出
-+- API key alias 管理
-+- 模型价格管理与 LiteLLM 价格同步
-+- 内置 usage collector，随主服务启动/停止
-+- Docker 构建时自动打包 Plus 前端到 Go 服务中
++启动：
  
 -## Getting Started
-+## 快速运行
++```bash
++docker compose up -d --build
++```
  
 -CLIProxyAPI Guides: [https://help.router-for.me/](https://help.router-for.me/)
-+### 1. 准备配置
++访问：
  
 -## Management API
-+```bash
-+cp config.example.yaml config.yaml
++```text
++http://host:8317/management.html
 +```
  
 -see [MANAGEMENT_API.md](https://help.router-for.me/management/api)
-+至少修改：
++## Docker 数据目录
  
 -## Usage Statistics
-+```yaml
-+port: 8317
++默认挂载：
  
 -Since v6.10.0, CLIProxyAPI and [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) no longer ship built-in usage statistics. If you need usage statistics, use:
-+remote-management:
-+  allow-remote: true
-+  secret-key: "请改成你自己的强密码"
++```text
++./config.yaml -> /CLIProxyAPI/config.yaml
++./auths       -> /root/.cli-proxy-api
++./logs        -> /CLIProxyAPI/logs
++./data        -> /CLIProxyAPI/data
++```
  
 -### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
-+plus-manager:
-+  enabled: true
-+  data-dir: ./data
-+  db-path: ./data/usage.sqlite
-+  collector-enabled: true
-+  collector-mode: auto
-+  poll-interval-ms: 1000
-+```
++Plus 数据库：
  
 -Standalone persistence and visualization service for CLIProxyAPI, with periodic data sync, SQLite storage, aggregate APIs, and a built-in dashboard for usage and statistics.
-+如果只允许本机访问管理端，可设置：
- 
--### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
-+```yaml
-+remote-management:
-+  allow-remote: false
++```text
++./data/usage.sqlite
 +```
  
+-### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
++## 日常维护
+ 
 -Full CLIProxyAPI management center with request-level monitoring and cost estimates. CPA-Manager tracks collected requests by account, model, channel, latency, status, and token usage; estimates cost with editable model prices and one-click LiteLLM price sync; persists events in SQLite; and provides Codex account-pool operations with batch inspection, quota detection, unhealthy account discovery, cleanup suggestions, and one-click execution for day-to-day multi-account maintenance.
-+### 2. 启动 Docker
++重建并启动：
  
 -## SDK Docs
 +```bash
@@ -215,201 +212,84 @@ index c6a0178b..268a32bf 100644
 -- Access: [docs/sdk-access.md](docs/sdk-access.md)
 -- Watcher: [docs/sdk-watcher.md](docs/sdk-watcher.md)
 -- Custom Provider Example: `examples/custom-provider`
-+默认挂载：
++查看日志：
  
 -## Contributing
-+```text
-+./config.yaml -> /CLIProxyAPI/config.yaml
-+./auths       -> /root/.cli-proxy-api
-+./logs        -> /CLIProxyAPI/logs
-+./data        -> /CLIProxyAPI/data
++```bash
++docker compose logs -f cli-proxy-api
 +```
  
 -Contributions are welcome! Please feel free to submit a Pull Request.
-+### 3. 访问面板
++停止：
  
 -1. Fork the repository
 -2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 -3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 -4. Push to the branch (`git push origin feature/amazing-feature`)
 -5. Open a Pull Request
-+```text
-+http://host:8317/management.html
-+```
- 
--## Who is with us?
-+登录时使用 `config.yaml` 中的：
- 
--Those projects are based on CLIProxyAPI:
-+```text
-+remote-management.secret-key
-+```
- 
--### [vibeproxy](https://github.com/automazeio/vibeproxy)
-+### 4. API 调用
- 
--Native macOS menu bar app to use your Claude Code & ChatGPT subscriptions with AI coding tools - no API keys needed
-+主 API 与原 CLIProxyAPI 保持一致，基础地址为：
- 
--### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
-+```text
-+http://host:8317
-+```
- 
--A cross-platform desktop and web app to translate and validate SRT subtitles using your existing LLM subscriptions (Gemini, ChatGPT, Claude, etc.) via CLIProxyAPI - no API keys needed.
-+Plus 集成接口在：
- 
--### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
-+```text
-+/v0/management/plus/*
-+```
- 
--CLI wrapper for instant switching between multiple Claude accounts and alternative models (Gemini, Codex, Antigravity) via CLIProxyAPI OAuth - no API keys needed
-+## 常用运维命令
- 
--### [Quotio](https://github.com/nguyenphutrong/quotio)
-+启动/重建：
- 
--Native macOS menu bar app that unifies Claude, Gemini, OpenAI, and Antigravity subscriptions with real-time quota tracking and smart auto-failover for AI coding tools like Claude Code, OpenCode, and Droid - no API keys needed.
-+```bash
-+docker compose up -d --build
-+```
- 
--### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
-+查看容器：
- 
--Windows-native CLIProxyAPI fork with TUI, system tray, and multi-provider OAuth for AI coding tools - no API keys needed.
-+```bash
-+docker compose ps
-+```
- 
--### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
-+查看日志：
- 
--VSCode extension for quick switching between Claude Code models, featuring integrated CLIProxyAPI as its backend with automatic background lifecycle management.
-+```bash
-+docker compose logs -f cli-proxy-api
-+```
- 
--### [ZeroLimit](https://github.com/0xtbug/zero-limit)
-+停止：
- 
--Windows desktop app built with Tauri + React for monitoring AI coding assistant quotas via CLIProxyAPI. Track usage across Gemini, Claude, OpenAI Codex, and Antigravity accounts with real-time dashboard, system tray integration, and one-click proxy control - no API keys needed.
 +```bash
 +docker compose down
 +```
  
--### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
+-## Who is with us?
 +重启：
  
--A lightweight web admin panel for CLIProxyAPI with health checks, resource monitoring, real-time logs, auto-update, request statistics and pricing display. Supports one-click installation and systemd service.
+-Those projects are based on CLIProxyAPI:
 +```bash
 +docker compose restart cli-proxy-api
 +```
  
--### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
-+## 数据、备份与恢复
+-### [vibeproxy](https://github.com/automazeio/vibeproxy)
++## 同步上游
  
--A Windows tray application implemented using PowerShell scripts, without relying on any third-party libraries. The main features include: automatic creation of shortcuts, silent running, password management, channel switching (Main / Plus), and automatic downloading and updating.
-+建议重点备份：
+-Native macOS menu bar app to use your Claude Code & ChatGPT subscriptions with AI coding tools - no API keys needed
++本分支保留完整源码，适合开发、调试和同步上游。
  
--### [霖君](https://github.com/wangdabaoqq/LinJun)
-+```text
-+config.yaml
-+.env                         # 如果你实际使用了 .env
-+auths/
-+data/usage.sqlite
-+```
- 
--霖君 is a cross-platform desktop application for managing AI programming assistants, supporting macOS, Windows, and Linux systems. Unified management of Claude Code, Gemini CLI, OpenAI Codex, and other AI coding tools, with local proxy for multi-account quota tracking and one-click configuration.
-+备份示例：
- 
--### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
-+```bash
-+mkdir -p backups
-+cp config.yaml backups/config.yaml.$(date +%Y%m%d%H%M%S)
-+tar -czf backups/auths.$(date +%Y%m%d%H%M%S).tgz auths
-+tar -czf backups/data.$(date +%Y%m%d%H%M%S).tgz data
-+```
- 
--A modern web-based management dashboard for CLIProxyAPI built with Next.js, React, and PostgreSQL. Features real-time log streaming, structured configuration editing, API key management, OAuth provider integration for Claude/Gemini/Codex, usage analytics, container management, and config sync with OpenCode via companion plugin - no manual YAML editing needed.
-+恢复时停止容器，替换对应文件/目录，再重新启动：
- 
--### [All API Hub](https://github.com/qixing-jk/all-api-hub)
-+```bash
-+docker compose down
-+# restore config.yaml auths/ data/
-+docker compose up -d --build
-+```
- 
--Browser extension for one-stop management of New API-compatible relay site accounts, featuring balance and usage dashboards, auto check-in, one-click key export to common apps, in-page API availability testing, and channel/model sync and redirection. It integrates with CLIProxyAPI through the Management API for one-click provider import and config sync.
-+## 高频上游同步方案
- 
--### [Shadow AI](https://github.com/HEUDavid/shadow-ai)
-+本项目包含本地同步脚本，用于快速吸收两个上游项目更新。
- 
--Shadow AI is an AI assistant tool designed specifically for restricted environments. It provides a stealthy operation
--mode without windows or traces, and enables cross-device AI Q&A interaction and control via the local area network (
--LAN). Essentially, it is an automated collaboration layer of "screen/audio capture + AI inference + low-friction delivery",
--helping users to immersively use AI assistants across applications on controlled devices or in restricted environments.
+-### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
 +一键同步两个上游：
  
--### [ProxyPal](https://github.com/buddingnewinsights/proxypal)
+-A cross-platform desktop and web app to translate and validate SRT subtitles using your existing LLM subscriptions (Gemini, ChatGPT, Claude, etc.) via CLIProxyAPI - no API keys needed.
 +```bash
 +./scripts/local-update-all.sh
 +```
  
--Cross-platform desktop app (macOS, Windows, Linux) wrapping CLIProxyAPI with a native GUI. Connects Claude, ChatGPT, Gemini, GitHub Copilot, and custom OpenAI-compatible endpoints with usage analytics, request monitoring, and auto-configuration for popular coding tools - no API keys needed.
+-### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
 +只同步 CLIProxyAPI：
  
--### [CLIProxyAPI Quota Inspector](https://github.com/AllenReder/CLIProxyAPI-Quota-Inspector)
+-CLI wrapper for instant switching between multiple Claude accounts and alternative models (Gemini, Codex, Antigravity) via CLIProxyAPI OAuth - no API keys needed
 +```bash
 +./scripts/local-update-cli.sh
 +```
  
--Ready-to-use cross-platform quota inspector for CLIProxyAPI, supporting per-account codex 5h/7d quota windows, plan-based sorting, status coloring, and multi-account summary analytics.
-+只同步 CPA-Manager-Plus 前端：
+-### [Quotio](https://github.com/nguyenphutrong/quotio)
++只同步 Plus 前端：
  
--### [CLIProxy Pool Watch](https://github.com/murasame612/CLIProxyPoolWidget)
+-Native macOS menu bar app that unifies Claude, Gemini, OpenAI, and Antigravity subscriptions with real-time quota tracking and smart auto-failover for AI coding tools like Claude Code, OpenCode, and Droid - no API keys needed.
 +```bash
 +./scripts/local-update-plus-web.sh
 +```
  
--Native macOS SwiftUI app for monitoring ChatGPT/Codex account quotas in CLIProxyAPI pools. Displays account availability, Plus-base capacity, 5-hour and weekly quota bars, plan weights, and restore forecasts through the Management API.
-+同步后建议检查并提交：
+-### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
++同步后：
  
--### [Panopticon](https://github.com/eltmon/panopticon-cli)
+-Windows-native CLIProxyAPI fork with TUI, system tray, and multi-provider OAuth for AI coding tools - no API keys needed.
 +```bash
 +git status --short
 +git diff --stat
-+git add README.md README_CN.md Dockerfile config.example.yaml docker-compose.yml internal web scripts docs
-+git commit -m "chore: sync upstream updates"
 +docker compose up -d --build
 +```
  
--Multi-agent orchestration for AI coding assistants. Runs CLIProxyAPI as a local sidecar so its agents can drive GPT models through a ChatGPT subscription, pointing Claude Code at an Anthropic-compatible endpoint with no OpenAI API key required.
-+不要使用 `git add .`，避免误提交隐私文件。
+-### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
++## 隐私安全
  
--### [Tunnel Agent](https://github.com/Villoh/tunnel-agent)
-+详细流程见：
+-VSCode extension for quick switching between Claude Code models, featuring integrated CLIProxyAPI as its backend with automatic background lifecycle management.
++不要提交：
  
--Windows desktop UI that manages CLIProxyAPI and Perplexity WebUI Scraper from a single interface, inspired by Quotio and VibeProxy. Connect OAuth providers (Claude, Gemini CLI, Codex, Kimi, Antigravity), custom API keys, and Perplexity session accounts, then point any coding agent at the local endpoint.
-+- `docs/local-upstream-sync.md`
-+- `docs/cpa-plus-work-log-and-maintenance.md`
- 
--> [!NOTE]  
--> If you developed a project based on CLIProxyAPI, please open a PR to add it to this list.
-+## 隐私安全清单
- 
--## More choices
-+这些内容不要提交到 GitHub：
- 
--Those projects are ports of CLIProxyAPI or inspired by it:
+-### [ZeroLimit](https://github.com/0xtbug/zero-limit)
 +```text
 +config.yaml
 +.env
-+.env.*.local
-+auths/                 # 只保留 auths/.gitkeep
++auths/  # 除 auths/.gitkeep
 +data/
 +logs/
 +*.sqlite
@@ -421,33 +301,87 @@ index c6a0178b..268a32bf 100644
 +.gemini/
 +```
  
--### [9Router](https://github.com/decolua/9router)
-+提交前建议执行：
+-Windows desktop app built with Tauri + React for monitoring AI coding assistant quotas via CLIProxyAPI. Track usage across Gemini, Claude, OpenAI Codex, and Antigravity accounts with real-time dashboard, system tray integration, and one-click proxy control - no API keys needed.
++提交前检查：
  
--A Next.js implementation inspired by CLIProxyAPI, easy to install and use, built from scratch with format translation (OpenAI/Claude/Gemini/Ollama), combo system with auto-fallback, multi-account management with exponential backoff, a Next.js web dashboard, and support for CLI tools (Cursor, Claude Code, Cline, RooCode) - no API keys needed.
+-### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
 +```bash
 +git status --short
 +git diff --cached --name-only
 +```
  
+-A lightweight web admin panel for CLIProxyAPI with health checks, resource monitoring, real-time logs, auto-update, request statistics and pricing display. Supports one-click installation and systemd service.
++## 相关文档
+ 
+-### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
++```text
++docs/cpa-plus-integrated.md
++docs/cpa-plus-work-log-and-maintenance.md
++docs/local-upstream-sync.md
++```
+ 
+-A Windows tray application implemented using PowerShell scripts, without relying on any third-party libraries. The main features include: automatic creation of shortcuts, silent running, password management, channel switching (Main / Plus), and automatic downloading and updating.
++## 来源
+ 
+-### [霖君](https://github.com/wangdabaoqq/LinJun)
++CPA-PLUS 基于以下项目整合维护：
+ 
+-霖君 is a cross-platform desktop application for managing AI programming assistants, supporting macOS, Windows, and Linux systems. Unified management of Claude Code, Gemini CLI, OpenAI Codex, and other AI coding tools, with local proxy for multi-account quota tracking and one-click configuration.
+-
+-### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
+-
+-A modern web-based management dashboard for CLIProxyAPI built with Next.js, React, and PostgreSQL. Features real-time log streaming, structured configuration editing, API key management, OAuth provider integration for Claude/Gemini/Codex, usage analytics, container management, and config sync with OpenCode via companion plugin - no manual YAML editing needed.
+-
+-### [All API Hub](https://github.com/qixing-jk/all-api-hub)
+-
+-Browser extension for one-stop management of New API-compatible relay site accounts, featuring balance and usage dashboards, auto check-in, one-click key export to common apps, in-page API availability testing, and channel/model sync and redirection. It integrates with CLIProxyAPI through the Management API for one-click provider import and config sync.
+-
+-### [Shadow AI](https://github.com/HEUDavid/shadow-ai)
+-
+-Shadow AI is an AI assistant tool designed specifically for restricted environments. It provides a stealthy operation
+-mode without windows or traces, and enables cross-device AI Q&A interaction and control via the local area network (
+-LAN). Essentially, it is an automated collaboration layer of "screen/audio capture + AI inference + low-friction delivery",
+-helping users to immersively use AI assistants across applications on controlled devices or in restricted environments.
+-
+-### [ProxyPal](https://github.com/buddingnewinsights/proxypal)
+-
+-Cross-platform desktop app (macOS, Windows, Linux) wrapping CLIProxyAPI with a native GUI. Connects Claude, ChatGPT, Gemini, GitHub Copilot, and custom OpenAI-compatible endpoints with usage analytics, request monitoring, and auto-configuration for popular coding tools - no API keys needed.
+-
+-### [CLIProxyAPI Quota Inspector](https://github.com/AllenReder/CLIProxyAPI-Quota-Inspector)
+-
+-Ready-to-use cross-platform quota inspector for CLIProxyAPI, supporting per-account codex 5h/7d quota windows, plan-based sorting, status coloring, and multi-account summary analytics.
+-
+-### [CLIProxy Pool Watch](https://github.com/murasame612/CLIProxyPoolWidget)
+-
+-Native macOS SwiftUI app for monitoring ChatGPT/Codex account quotas in CLIProxyAPI pools. Displays account availability, Plus-base capacity, 5-hour and weekly quota bars, plan weights, and restore forecasts through the Management API.
+-
+-### [Panopticon](https://github.com/eltmon/panopticon-cli)
+-
+-Multi-agent orchestration for AI coding assistants. Runs CLIProxyAPI as a local sidecar so its agents can drive GPT models through a ChatGPT subscription, pointing Claude Code at an Anthropic-compatible endpoint with no OpenAI API key required.
+-
+-### [Tunnel Agent](https://github.com/Villoh/tunnel-agent)
+-
+-Windows desktop UI that manages CLIProxyAPI and Perplexity WebUI Scraper from a single interface, inspired by Quotio and VibeProxy. Connect OAuth providers (Claude, Gemini CLI, Codex, Kimi, Antigravity), custom API keys, and Perplexity session accounts, then point any coding agent at the local endpoint.
+-
+-> [!NOTE]  
+-> If you developed a project based on CLIProxyAPI, please open a PR to add it to this list.
+-
+-## More choices
+-
+-Those projects are ports of CLIProxyAPI or inspired by it:
+-
+-### [9Router](https://github.com/decolua/9router)
+-
+-A Next.js implementation inspired by CLIProxyAPI, easy to install and use, built from scratch with format translation (OpenAI/Claude/Gemini/Ollama), combo system with auto-fallback, multi-account management with exponential backoff, a Next.js web dashboard, and support for CLI tools (Cursor, Claude Code, Cline, RooCode) - no API keys needed.
+-
 -### [OmniRoute](https://github.com/diegosouzapw/OmniRoute)
-+如需发布到私有仓库，建议使用无历史快照方式，而不是直接推送包含旧历史的完整仓库。
- 
+-
 -Never stop coding. Smart routing to FREE & low-cost AI models with automatic fallback.
-+## 重要文档
- 
+-
 -OmniRoute is an AI gateway for multi-provider LLMs: an OpenAI-compatible endpoint with smart routing, load balancing, retries, and fallbacks. Add policies, rate limits, caching, and observability for reliable, cost-aware inference.
-+- 整合部署说明：`docs/cpa-plus-integrated.md`
-+- 工作日志、功能说明与维护文档：`docs/cpa-plus-work-log-and-maintenance.md`
-+- 本地上游同步流程：`docs/local-upstream-sync.md`
-+- SDK 使用：`docs/sdk-usage.md`
-+- SDK 进阶：`docs/sdk-advanced.md`
-+- SDK 访问控制：`docs/sdk-access.md`
-+- SDK Watcher：`docs/sdk-watcher.md`
- 
+-
 -### [Playful Proxy API Panel (PPAP)](https://github.com/daishuge/playful-proxy-api-panel)
-+## 本仓库维护原则
- 
+-
 -A public CLIProxyAPI-compatible fork and bundled management panel. It keeps upstream-style usage while restoring built-in usage statistics, adding cache hit rate, first-byte latency, TPS tracking, and Docker-oriented self-hosted installation docs.
 -
 -### [Codex Switch](https://github.com/9ycrooked/CodexSwitch)
@@ -456,58 +390,61 @@ index c6a0178b..268a32bf 100644
 -
 -> [!NOTE]  
 -> If you have developed a port of CLIProxyAPI or a project inspired by it, please open a PR to add it to this list.
-+- 本地运行优先，私有仓库只保存可公开给自己的源码快照
-+- 上游同步优先使用脚本，不手工大范围复制
-+- 每次同步后先测试/构建，再部署
-+- 推送前先检查敏感文件和 staged 文件
-+- 保留 `cli-upstream` / `plus-upstream` 为只拉取远程，禁止误推上游
- 
- ## License
- 
+-
+-## License
+-
 -This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-+本仓库基于原 CLIProxyAPI 与 CPA-Manager-Plus 改造维护，相关许可请参考仓库中的 `LICENSE` 以及对应上游项目许可。
++- CLIProxyAPI：https://github.com/router-for-me/CLIProxyAPI
++- CPA-Manager-Plus：https://github.com/seakee/CPA-Manager-Plus
 diff --git a/README_CN.md b/README_CN.md
-index 94579885..268a32bf 100644
+index 94579885..1a1f8be7 100644
 --- a/README_CN.md
 +++ b/README_CN.md
-@@ -1,223 +1,269 @@
+@@ -1,223 +1,170 @@
 -# CLI 代理 API
-+# CPA-PLUS
++# CPA-PLUS Docker Branch
  
 -[English](README.md) | 中文 | [日本語](README_JA.md)
-+CPA-PLUS 是一个本地维护的 **CLIProxyAPI + CPA-Manager-Plus 整合版**。
++`main` 分支是 CPA-PLUS 的 **Docker 部署维护分支**。
  
 -一个为 CLI 提供 OpenAI/Gemini/Claude/Codex/Grok 兼容 API 接口的代理服务器。
-+它把 CLI Proxy API 主服务、完整 Plus Web 管理面板、请求统计持久化与 Plus 扩展 API 合并到同一个项目中，目标是减少部署和维护成本：
++它维护完整源码整合版：CLIProxyAPI 主服务、CPA-Manager-Plus 面板、Plus API、SQLite 请求统计和 usage collector 都打包进同一个 Docker 镜像。
  
 -现已支持通过 OAuth 登录接入 OpenAI Codex（GPT 系列）和 Claude Code。
++## 分支定位
+ 
+-您可以使用本地或多账户的CLI方式，通过任何与 OpenAI（包括Responses）/Gemini/Claude 兼容的客户端和SDK进行访问。
++```text
++main  = Docker 项目分支，适合容器部署和源码构建
++linux = Linux 二进制项目分支，适合直接运行二进制
++```
+ 
+-## 赞助商
++本分支目标：
+ 
+-[![https://www.packyapi.com/register?aff=cliproxyapi](./assets/packycode-cn.png)](https://www.packyapi.com/register?aff=cliproxyapi)
 +- 一个项目
 +- 一个 Docker 镜像/容器
 +- 一个端口：`8317`
 +- 一个入口：`http://host:8317/management.html`
 +- 一个管理密钥：`remote-management.secret-key`
  
--您可以使用本地或多账户的CLI方式，通过任何与 OpenAI（包括Responses）/Gemini/Claude 兼容的客户端和SDK进行访问。
-+> 本仓库适合私有自用部署。请不要提交真实 `config.yaml`、`.env`、`auths/`、`data/`、`logs/`、数据库、Token、Cookie 或 Codex/Claude/Gemini 等本地配置。
- 
--## 赞助商
-+## 项目来源
- 
--[![https://www.packyapi.com/register?aff=cliproxyapi](./assets/packycode-cn.png)](https://www.packyapi.com/register?aff=cliproxyapi)
-+CPA-PLUS 基于以下两个项目整合维护：
- 
 -感谢 PackyCode 对本项目的赞助！
-+- CLIProxyAPI：<https://github.com/router-for-me/CLIProxyAPI>
-+- CPA-Manager-Plus：<https://github.com/seakee/CPA-Manager-Plus>
++## 快速运行 Docker
  
 -PackyCode 是一家可靠高效的 API 中转服务商，提供 Claude Code、Codex、Gemini 等多种服务的中转。
-+本仓库保留原项目能力，并新增单端口集成、Plus 前端嵌入、Plus API、SQLite 持久化、usage collector 和高频上游同步脚本。
++```bash
++git clone -b main https://github.com/julioaaericksonaa/CPA-PLUS.git
++cd CPA-PLUS
++cp config.example.yaml config.yaml
++```
  
 -PackyCode 为本软件用户提供了特别优惠：使用<a href="https://www.packyapi.com/register?aff=cliproxyapi" target="_blank">此链接</a>注册，并在充值时输入 "cliproxyapi" 优惠码即可享受九折优惠。
-+## 功能介绍
++编辑 `config.yaml`：
  
 ----
-+### CLIProxyAPI 主能力
++```yaml
++port: 8317
  
 -<table>
 -<tbody>
@@ -535,25 +472,19 @@ index 94579885..268a32bf 100644
 -</tr>
 -</tbody>
 -</table>
-+- OpenAI / Gemini / Claude / Codex / Grok 兼容 API 代理
-+- OAuth 登录与多账号轮询
-+- OpenAI-compatible 上游配置
-+- 流式、非流式、多模态、工具调用等能力
-+- Management API 与本地配置热更新能力
++remote-management:
++  allow-remote: true
++  secret-key: "换成你自己的强密码"
  
-+### CPA-PLUS 集成能力
++plus-manager:
++  enabled: true
++  data-dir: ./data
++  db-path: ./data/usage.sqlite
++  collector-enabled: true
++```
  
 -## 功能特性
-+- 内置完整 Plus 管理面板：`/management.html`
-+- Plus API 统一挂载：`/v0/management/plus/*`
-+- 共用 CLIProxyAPI 管理密钥：`remote-management.secret-key`
-+- SQLite 持久化：默认 `./data/usage.sqlite`
-+- 请求监控、用量统计、失败请求、延迟、模型、账号/渠道维度分析
-+- usage 导入/导出
-+- API key alias 管理
-+- 模型价格管理与 LiteLLM 价格同步
-+- 内置 usage collector，随主服务启动/停止
-+- Docker 构建时自动打包 Plus 前端到 Go 服务中
++启动：
  
 -- 为 CLI 模型提供 OpenAI/Gemini/Claude/Codex/Grok 兼容的 API 端点
 -- 新增 OpenAI Codex（GPT 系列）支持（OAuth 登录）
@@ -572,63 +503,25 @@ index 94579885..268a32bf 100644
 -- 支持 Grok Build 多账户轮询
 -- 通过配置接入上游 OpenAI 兼容提供商（例如 OpenRouter）
 -- 可复用的 Go SDK（见 `docs/sdk-usage_CN.md`）
-+## 快速运行
- 
--## 新手入门
-+### 1. 准备配置
- 
--CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
-+```bash
-+cp config.example.yaml config.yaml
-+```
- 
--## 管理 API 文档
-+至少修改：
- 
--请参见 [MANAGEMENT_API_CN.md](https://help.router-for.me/cn/management/api)
-+```yaml
-+port: 8317
- 
--## 使用量统计
-+remote-management:
-+  allow-remote: true
-+  secret-key: "请改成你自己的强密码"
- 
--自v6.10.0版本以后，CLIProxyAPI及 [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) 项目不再预置数据统计功能，如果有数据统计需求的请使用以下项目：
-+plus-manager:
-+  enabled: true
-+  data-dir: ./data
-+  db-path: ./data/usage.sqlite
-+  collector-enabled: true
-+  collector-mode: auto
-+  poll-interval-ms: 1000
-+```
- 
--### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
-+如果只允许本机访问管理端，可设置：
- 
--独立的 CLIProxyAPI 使用量持久化与可视化服务，定期同步 CLIProxyAPI 数据，存储到 SQLite，提供聚合 API，并内置使用量分析与统计仪表盘。
-+```yaml
-+remote-management:
-+  allow-remote: false
-+```
- 
--### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
-+### 2. 启动 Docker
- 
--面向 CLIProxyAPI 的完整管理中心，提供请求级监控和费用预估。CPA-Manager 可按账号、模型、渠道、延迟、状态和 token 用量追踪采集到的请求；支持可编辑模型价格与一键同步 LiteLLM 价格来估算费用；用 SQLite 持久化事件；并提供面向 Codex 账号池的批量巡检、配额识别、异常账号定位、清理建议与一键执行能力，适合多账号池的日常运维管理。
 +```bash
 +docker compose up -d --build
 +```
  
--## SDK 文档
+-## 新手入门
++访问：
+ 
+-CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
++```text
++http://host:8317/management.html
++```
+ 
+-## 管理 API 文档
++## Docker 数据目录
+ 
+-请参见 [MANAGEMENT_API_CN.md](https://help.router-for.me/cn/management/api)
 +默认挂载：
  
--- 使用文档：[docs/sdk-usage_CN.md](docs/sdk-usage_CN.md)
--- 高级（执行器与翻译器）：[docs/sdk-advanced_CN.md](docs/sdk-advanced_CN.md)
--- 认证: [docs/sdk-access_CN.md](docs/sdk-access_CN.md)
--- 凭据加载/更新: [docs/sdk-watcher_CN.md](docs/sdk-watcher_CN.md)
--- 自定义 Provider 示例：`examples/custom-provider`
+-## 使用量统计
 +```text
 +./config.yaml -> /CLIProxyAPI/config.yaml
 +./auths       -> /root/.cli-proxy-api
@@ -636,12 +529,43 @@ index 94579885..268a32bf 100644
 +./data        -> /CLIProxyAPI/data
 +```
  
+-自v6.10.0版本以后，CLIProxyAPI及 [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) 项目不再预置数据统计功能，如果有数据统计需求的请使用以下项目：
++Plus 数据库：
+ 
+-### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
++```text
++./data/usage.sqlite
++```
+ 
+-独立的 CLIProxyAPI 使用量持久化与可视化服务，定期同步 CLIProxyAPI 数据，存储到 SQLite，提供聚合 API，并内置使用量分析与统计仪表盘。
++## 日常维护
+ 
+-### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
++重建并启动：
+ 
+-面向 CLIProxyAPI 的完整管理中心，提供请求级监控和费用预估。CPA-Manager 可按账号、模型、渠道、延迟、状态和 token 用量追踪采集到的请求；支持可编辑模型价格与一键同步 LiteLLM 价格来估算费用；用 SQLite 持久化事件；并提供面向 Codex 账号池的批量巡检、配额识别、异常账号定位、清理建议与一键执行能力，适合多账号池的日常运维管理。
++```bash
++docker compose up -d --build
++```
+ 
+-## SDK 文档
++查看日志：
+ 
+-- 使用文档：[docs/sdk-usage_CN.md](docs/sdk-usage_CN.md)
+-- 高级（执行器与翻译器）：[docs/sdk-advanced_CN.md](docs/sdk-advanced_CN.md)
+-- 认证: [docs/sdk-access_CN.md](docs/sdk-access_CN.md)
+-- 凭据加载/更新: [docs/sdk-watcher_CN.md](docs/sdk-watcher_CN.md)
+-- 自定义 Provider 示例：`examples/custom-provider`
++```bash
++docker compose logs -f cli-proxy-api
++```
+ 
 -## 贡献
-+### 3. 访问面板
++停止：
  
 -欢迎贡献！请随时提交 Pull Request。
-+```text
-+http://host:8317/management.html
++```bash
++docker compose down
 +```
  
 -1. Fork 仓库
@@ -649,175 +573,64 @@ index 94579885..268a32bf 100644
 -3. 提交您的更改（`git commit -m 'Add some amazing feature'`）
 -4. 推送到分支（`git push origin feature/amazing-feature`）
 -5. 打开 Pull Request
-+登录时使用 `config.yaml` 中的：
- 
--## 谁与我们在一起？
-+```text
-+remote-management.secret-key
-+```
- 
--这些项目基于 CLIProxyAPI:
-+### 4. API 调用
- 
--### [vibeproxy](https://github.com/automazeio/vibeproxy)
-+主 API 与原 CLIProxyAPI 保持一致，基础地址为：
- 
--一个原生 macOS 菜单栏应用，让您可以使用 Claude Code & ChatGPT 订阅服务和 AI 编程工具，无需 API 密钥。
-+```text
-+http://host:8317
-+```
- 
--### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
-+Plus 集成接口在：
- 
--一款跨平台的桌面和 Web 应用程序，可通过 CLIProxyAPI 使用您现有的 LLM 订阅（Gemini、ChatGPT、Claude, etc.）来翻译和验证 SRT 字幕 - 无需 API 密钥。
-+```text
-+/v0/management/plus/*
-+```
- 
--### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
-+## 常用运维命令
- 
--CLI 封装器，用于通过 CLIProxyAPI OAuth 即时切换多个 Claude 账户和替代模型（Gemini, Codex, Antigravity），无需 API 密钥。
-+启动/重建：
- 
--### [Quotio](https://github.com/nguyenphutrong/quotio)
-+```bash
-+docker compose up -d --build
-+```
- 
--原生 macOS 菜单栏应用，统一管理 Claude、Gemini、OpenAI 和 Antigravity 订阅，提供实时配额追踪和智能自动故障转移，支持 Claude Code、OpenCode 和 Droid 等 AI 编程工具，无需 API 密钥。
-+查看容器：
- 
--### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
-+```bash
-+docker compose ps
-+```
- 
--原生 Windows CLIProxyAPI 分支，集成 TUI、系统托盘及多服务商 OAuth 认证，专为 AI 编程工具打造，无需 API 密钥。
-+查看日志：
- 
--### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
-+```bash
-+docker compose logs -f cli-proxy-api
-+```
- 
--一款 VSCode 扩展，提供了在 VSCode 中快速切换 Claude Code 模型的功能，内置 CLIProxyAPI 作为其后端，支持后台自动启动和关闭。
-+停止：
- 
--### [ZeroLimit](https://github.com/0xtbug/zero-limit)
-+```bash
-+docker compose down
-+```
- 
--Windows 桌面应用，基于 Tauri + React 构建，用于通过 CLIProxyAPI 监控 AI 编程助手配额。支持跨 Gemini、Claude、OpenAI Codex 和 Antigravity 账户的使用量追踪，提供实时仪表盘、系统托盘集成和一键代理控制，无需 API 密钥。
 +重启：
  
--### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
+-## 谁与我们在一起？
 +```bash
 +docker compose restart cli-proxy-api
 +```
  
--面向 CLIProxyAPI 的 Web 管理面板，提供健康检查、资源监控、日志查看、自动更新、请求统计与定价展示，支持一键安装与 systemd 服务。
-+## 数据、备份与恢复
+-这些项目基于 CLIProxyAPI:
++## 同步上游
  
--### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
-+建议重点备份：
+-### [vibeproxy](https://github.com/automazeio/vibeproxy)
++本分支保留完整源码，适合开发、调试和同步上游。
  
--Windows 托盘应用，基于 PowerShell 脚本实现，不依赖任何第三方库。主要功能包括：自动创建快捷方式、静默运行、密码管理、通道切换（Main / Plus）以及自动下载与更新。
-+```text
-+config.yaml
-+.env                         # 如果你实际使用了 .env
-+auths/
-+data/usage.sqlite
-+```
- 
--### [霖君](https://github.com/wangdabaoqq/LinJun)
-+备份示例：
- 
--霖君是一款用于管理AI编程助手的跨平台桌面应用，支持macOS、Windows、Linux系统。统一管理Claude Code、Gemini CLI、OpenAI Codex等AI编程工具，本地代理实现多账户配额跟踪和一键配置。
-+```bash
-+mkdir -p backups
-+cp config.yaml backups/config.yaml.$(date +%Y%m%d%H%M%S)
-+tar -czf backups/auths.$(date +%Y%m%d%H%M%S).tgz auths
-+tar -czf backups/data.$(date +%Y%m%d%H%M%S).tgz data
-+```
- 
--### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
-+恢复时停止容器，替换对应文件/目录，再重新启动：
- 
--一个面向 CLIProxyAPI 的现代化 Web 管理仪表盘，基于 Next.js、React 和 PostgreSQL 构建。支持实时日志流、结构化配置编辑、API Key 管理、Claude/Gemini/Codex 的 OAuth 提供方集成、使用量分析、容器管理，并可通过配套插件与 OpenCode 同步配置，无需手动编辑 YAML。
-+```bash
-+docker compose down
-+# restore config.yaml auths/ data/
-+docker compose up -d --build
-+```
- 
--### [All API Hub](https://github.com/qixing-jk/all-api-hub)
-+## 高频上游同步方案
- 
--用于一站式管理 New API 兼容中转站账号的浏览器扩展，提供余额与用量看板、自动签到、密钥一键导出到常用应用、网页内 API 可用性测试，以及渠道与模型同步和重定向。支持通过 CLIProxyAPI Management API 一键导入 Provider 与同步配置。
-+本项目包含本地同步脚本，用于快速吸收两个上游项目更新。
- 
--### [Shadow AI](https://github.com/HEUDavid/shadow-ai)
+-一个原生 macOS 菜单栏应用，让您可以使用 Claude Code & ChatGPT 订阅服务和 AI 编程工具，无需 API 密钥。
 +一键同步两个上游：
  
--Shadow AI 是一款专为受限环境设计的 AI 辅助工具。提供无窗口、无痕迹的隐蔽运行方式，并通过局域网实现跨设备的 AI 问答交互与控制。本质上是一个「屏幕/音频采集 + AI 推理 + 低摩擦投送」的自动化协作层，帮助用户在受控设备/受限环境下沉浸式跨应用地使用 AI 助手。
+-### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
 +```bash
 +./scripts/local-update-all.sh
 +```
  
--### [ProxyPal](https://github.com/buddingnewinsights/proxypal)
+-一款跨平台的桌面和 Web 应用程序，可通过 CLIProxyAPI 使用您现有的 LLM 订阅（Gemini、ChatGPT、Claude, etc.）来翻译和验证 SRT 字幕 - 无需 API 密钥。
 +只同步 CLIProxyAPI：
  
--跨平台桌面应用（macOS、Windows、Linux），以原生 GUI 封装 CLIProxyAPI。支持连接 Claude、ChatGPT、Gemini、GitHub Copilot 及自定义 OpenAI 兼容端点，具备使用分析、请求监控和热门编程工具自动配置功能，无需 API 密钥。
+-### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
 +```bash
 +./scripts/local-update-cli.sh
 +```
  
--### [CLIProxyAPI Quota Inspector](https://github.com/AllenReder/CLIProxyAPI-Quota-Inspector)
-+只同步 CPA-Manager-Plus 前端：
+-CLI 封装器，用于通过 CLIProxyAPI OAuth 即时切换多个 Claude 账户和替代模型（Gemini, Codex, Antigravity），无需 API 密钥。
++只同步 Plus 前端：
  
--上手即用的面向 CLIProxyAPI 跨平台配额查询工具，支持按账号展示 codex 5h/7d 配额窗口、按计划排序、状态着色及多账号汇总分析。
+-### [Quotio](https://github.com/nguyenphutrong/quotio)
 +```bash
 +./scripts/local-update-plus-web.sh
 +```
  
--### [CLIProxy Pool Watch](https://github.com/murasame612/CLIProxyPoolWidget)
-+同步后建议检查并提交：
+-原生 macOS 菜单栏应用，统一管理 Claude、Gemini、OpenAI 和 Antigravity 订阅，提供实时配额追踪和智能自动故障转移，支持 Claude Code、OpenCode 和 Droid 等 AI 编程工具，无需 API 密钥。
++同步后：
  
--原生 macOS SwiftUI 应用，用于监控 CLIProxyAPI 池中的 ChatGPT/Codex 账号额度。通过 Management API 展示账号可用状态、Plus 基准容量、5 小时与周额度进度条、套餐权重和恢复预测。
+-### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
 +```bash
 +git status --short
 +git diff --stat
-+git add README.md README_CN.md Dockerfile config.example.yaml docker-compose.yml internal web scripts docs
-+git commit -m "chore: sync upstream updates"
 +docker compose up -d --build
 +```
  
--### [Panopticon](https://github.com/eltmon/panopticon-cli)
-+不要使用 `git add .`，避免误提交隐私文件。
+-原生 Windows CLIProxyAPI 分支，集成 TUI、系统托盘及多服务商 OAuth 认证，专为 AI 编程工具打造，无需 API 密钥。
++## 隐私安全
  
--面向 AI 编程助手的多智能体编排工具。它将 CLIProxyAPI 作为本地 sidecar 运行，使其智能体可以通过 ChatGPT 订阅驱动 GPT 模型，并将 Claude Code 指向 Anthropic 兼容端点，无需 OpenAI API 密钥。
-+详细流程见：
+-### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
++不要提交：
  
--### [Tunnel Agent](https://github.com/Villoh/tunnel-agent)
-+- `docs/local-upstream-sync.md`
-+- `docs/cpa-plus-work-log-and-maintenance.md`
- 
--Windows 桌面 UI，通过单一界面管理 CLIProxyAPI 和 Perplexity WebUI Scraper，灵感来自 Quotio 和 VibeProxy。连接 OAuth 提供商（Claude、Gemini CLI、Codex、Kimi、Antigravity）、自定义 API 密钥和 Perplexity 会话账号，然后将任意编程智能体指向本地端点。
-+## 隐私安全清单
- 
--> [!NOTE]  
--> 如果你开发了基于 CLIProxyAPI 的项目，请提交一个 PR（拉取请求）将其添加到此列表中。
-+这些内容不要提交到 GitHub：
- 
--## 更多选择
+-一款 VSCode 扩展，提供了在 VSCode 中快速切换 Claude Code 模型的功能，内置 CLIProxyAPI 作为其后端，支持后台自动启动和关闭。
 +```text
 +config.yaml
 +.env
-+.env.*.local
-+auths/                 # 只保留 auths/.gitkeep
++auths/  # 除 auths/.gitkeep
 +data/
 +logs/
 +*.sqlite
@@ -829,43 +642,88 @@ index 94579885..268a32bf 100644
 +.gemini/
 +```
  
--以下项目是 CLIProxyAPI 的移植版或受其启发：
-+提交前建议执行：
+-### [ZeroLimit](https://github.com/0xtbug/zero-limit)
++提交前检查：
  
--### [9Router](https://github.com/decolua/9router)
+-Windows 桌面应用，基于 Tauri + React 构建，用于通过 CLIProxyAPI 监控 AI 编程助手配额。支持跨 Gemini、Claude、OpenAI Codex 和 Antigravity 账户的使用量追踪，提供实时仪表盘、系统托盘集成和一键代理控制，无需 API 密钥。
 +```bash
 +git status --short
 +git diff --cached --name-only
 +```
  
+-### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
++## 相关文档
+ 
+-面向 CLIProxyAPI 的 Web 管理面板，提供健康检查、资源监控、日志查看、自动更新、请求统计与定价展示，支持一键安装与 systemd 服务。
++```text
++docs/cpa-plus-integrated.md
++docs/cpa-plus-work-log-and-maintenance.md
++docs/local-upstream-sync.md
++```
+ 
+-### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
++## 来源
+ 
+-Windows 托盘应用，基于 PowerShell 脚本实现，不依赖任何第三方库。主要功能包括：自动创建快捷方式、静默运行、密码管理、通道切换（Main / Plus）以及自动下载与更新。
++CPA-PLUS 基于以下项目整合维护：
+ 
+-### [霖君](https://github.com/wangdabaoqq/LinJun)
+-
+-霖君是一款用于管理AI编程助手的跨平台桌面应用，支持macOS、Windows、Linux系统。统一管理Claude Code、Gemini CLI、OpenAI Codex等AI编程工具，本地代理实现多账户配额跟踪和一键配置。
+-
+-### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
+-
+-一个面向 CLIProxyAPI 的现代化 Web 管理仪表盘，基于 Next.js、React 和 PostgreSQL 构建。支持实时日志流、结构化配置编辑、API Key 管理、Claude/Gemini/Codex 的 OAuth 提供方集成、使用量分析、容器管理，并可通过配套插件与 OpenCode 同步配置，无需手动编辑 YAML。
+-
+-### [All API Hub](https://github.com/qixing-jk/all-api-hub)
+-
+-用于一站式管理 New API 兼容中转站账号的浏览器扩展，提供余额与用量看板、自动签到、密钥一键导出到常用应用、网页内 API 可用性测试，以及渠道与模型同步和重定向。支持通过 CLIProxyAPI Management API 一键导入 Provider 与同步配置。
+-
+-### [Shadow AI](https://github.com/HEUDavid/shadow-ai)
+-
+-Shadow AI 是一款专为受限环境设计的 AI 辅助工具。提供无窗口、无痕迹的隐蔽运行方式，并通过局域网实现跨设备的 AI 问答交互与控制。本质上是一个「屏幕/音频采集 + AI 推理 + 低摩擦投送」的自动化协作层，帮助用户在受控设备/受限环境下沉浸式跨应用地使用 AI 助手。
+-
+-### [ProxyPal](https://github.com/buddingnewinsights/proxypal)
+-
+-跨平台桌面应用（macOS、Windows、Linux），以原生 GUI 封装 CLIProxyAPI。支持连接 Claude、ChatGPT、Gemini、GitHub Copilot 及自定义 OpenAI 兼容端点，具备使用分析、请求监控和热门编程工具自动配置功能，无需 API 密钥。
+-
+-### [CLIProxyAPI Quota Inspector](https://github.com/AllenReder/CLIProxyAPI-Quota-Inspector)
+-
+-上手即用的面向 CLIProxyAPI 跨平台配额查询工具，支持按账号展示 codex 5h/7d 配额窗口、按计划排序、状态着色及多账号汇总分析。
+-
+-### [CLIProxy Pool Watch](https://github.com/murasame612/CLIProxyPoolWidget)
+-
+-原生 macOS SwiftUI 应用，用于监控 CLIProxyAPI 池中的 ChatGPT/Codex 账号额度。通过 Management API 展示账号可用状态、Plus 基准容量、5 小时与周额度进度条、套餐权重和恢复预测。
+-
+-### [Panopticon](https://github.com/eltmon/panopticon-cli)
+-
+-面向 AI 编程助手的多智能体编排工具。它将 CLIProxyAPI 作为本地 sidecar 运行，使其智能体可以通过 ChatGPT 订阅驱动 GPT 模型，并将 Claude Code 指向 Anthropic 兼容端点，无需 OpenAI API 密钥。
+-
+-### [Tunnel Agent](https://github.com/Villoh/tunnel-agent)
+-
+-Windows 桌面 UI，通过单一界面管理 CLIProxyAPI 和 Perplexity WebUI Scraper，灵感来自 Quotio 和 VibeProxy。连接 OAuth 提供商（Claude、Gemini CLI、Codex、Kimi、Antigravity）、自定义 API 密钥和 Perplexity 会话账号，然后将任意编程智能体指向本地端点。
+-
+-> [!NOTE]  
+-> 如果你开发了基于 CLIProxyAPI 的项目，请提交一个 PR（拉取请求）将其添加到此列表中。
+-
+-## 更多选择
+-
+-以下项目是 CLIProxyAPI 的移植版或受其启发：
+-
+-### [9Router](https://github.com/decolua/9router)
+-
 -基于 Next.js 的实现，灵感来自 CLIProxyAPI，易于安装使用；自研格式转换（OpenAI/Claude/Gemini/Ollama）、组合系统与自动回退、多账户管理（指数退避）、Next.js Web 控制台，并支持 Cursor、Claude Code、Cline、RooCode 等 CLI 工具，无需 API 密钥。
-+如需发布到私有仓库，建议使用无历史快照方式，而不是直接推送包含旧历史的完整仓库。
- 
+-
 -### [OmniRoute](https://github.com/diegosouzapw/OmniRoute)
-+## 重要文档
- 
+-
 -代码不止，创新不停。智能路由至免费及低成本 AI 模型，并支持自动故障转移。
-+- 整合部署说明：`docs/cpa-plus-integrated.md`
-+- 工作日志、功能说明与维护文档：`docs/cpa-plus-work-log-and-maintenance.md`
-+- 本地上游同步流程：`docs/local-upstream-sync.md`
-+- SDK 使用：`docs/sdk-usage.md`
-+- SDK 进阶：`docs/sdk-advanced.md`
-+- SDK 访问控制：`docs/sdk-access.md`
-+- SDK Watcher：`docs/sdk-watcher.md`
- 
+-
 -OmniRoute 是一个面向多供应商大语言模型的 AI 网关：它提供兼容 OpenAI 的端点，具备智能路由、负载均衡、重试及回退机制。通过添加策略、速率限制、缓存和可观测性，确保推理过程既可靠又具备成本意识。
-+## 本仓库维护原则
- 
+-
 -### [Playful Proxy API Panel (PPAP)](https://github.com/daishuge/playful-proxy-api-panel)
-+- 本地运行优先，私有仓库只保存可公开给自己的源码快照
-+- 上游同步优先使用脚本，不手工大范围复制
-+- 每次同步后先测试/构建，再部署
-+- 推送前先检查敏感文件和 staged 文件
-+- 保留 `cli-upstream` / `plus-upstream` 为只拉取远程，禁止误推上游
- 
+-
 -一个公开的 CLIProxyAPI 兼容二开版本和配套管理面板，尽量保持与上游一致的使用方式，同时恢复内置使用量统计，并补充缓存命中率、首字响应时间、TPS 记录和面向 Docker 自托管的安装说明。
-+## License
- 
+-
 -### [Codex Switch](https://github.com/9ycrooked/CodexSwitch)
 -
 -这是一个使用 Tauri 2 + Vue 3 构建的工具，用于管理多个 OpenAI Codex 桌面账户。它可以在已保存的 ChatGPT/Codex 认证配置之间切换，实时查看 5 小时和每周配额使用情况，验证 token 健康状态，查看当前账户详情，并在无需手动复制的情况下导入或保存 auth.json 文件。
@@ -884,7 +742,8 @@ index 94579885..268a32bf 100644
 -或
 -
 -Telegram 群：https://t.me/CLIProxyAPI
-+本仓库基于原 CLIProxyAPI 与 CPA-Manager-Plus 改造维护，相关许可请参考仓库中的 `LICENSE` 以及对应上游项目许可。
++- CLIProxyAPI：https://github.com/router-for-me/CLIProxyAPI
++- CPA-Manager-Plus：https://github.com/seakee/CPA-Manager-Plus
 diff --git a/README_JA.md b/README_JA.md
 index 5bfaf53b..41cb35fe 100644
 --- a/README_JA.md
@@ -2060,20 +1919,34 @@ index 5f0a03fb..4f6f5f40 100644
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 diff --git a/internal/api/server.go b/internal/api/server.go
-index a148dd87..bffaea00 100644
+index a148dd87..ef0b3eee 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
-@@ -34,6 +34,9 @@ import (
+@@ -6,8 +6,10 @@ package api
+ 
+ import (
+ 	"context"
++	"crypto/rand"
+ 	"crypto/subtle"
+ 	"crypto/tls"
++	"encoding/hex"
+ 	"encoding/json"
+ 	"errors"
+ 	"fmt"
+@@ -34,6 +36,12 @@ import (
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
++	pluscodexinspection "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/codexinspection"
 +	pluscollector "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/collector"
 +	plushttpapi "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/httpapi"
++	plusmanagerconfig "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/managerconfig"
 +	plusstore "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
++	plusworker "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/worker"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
  	sdkaccess "github.com/router-for-me/CLIProxyAPI/v7/sdk/access"
-@@ -207,6 +210,12 @@ type Server struct {
+@@ -207,6 +215,24 @@ type Server struct {
  	// pluginHost owns dynamic plugin Management API route dispatch.
  	pluginHost *pluginhost.Host
  
@@ -2083,20 +1956,52 @@ index a148dd87..bffaea00 100644
 +	// plusCollector consumes usage events into the integrated Plus store.
 +	plusCollector *pluscollector.Collector
 +
++	// plusManagerConfig resolves integrated Plus runtime and persisted manager settings.
++	plusManagerConfig *plusmanagerconfig.Service
++
++	// plusCodexInspection runs server-side Codex inspections.
++	plusCodexInspection *pluscodexinspection.Service
++
++	// plusCodexWorkerCancel stops the scheduled Codex inspection worker.
++	plusCodexWorkerCancel context.CancelFunc
++
++	// internalManagementPassword is a runtime-only localhost key for integrated Plus background jobs.
++	internalManagementPassword string
++
  	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
  	managementRoutesRegistered atomic.Bool
  	// managementRoutesEnabled controls whether management endpoints serve real handlers.
-@@ -331,6 +340,9 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -315,6 +341,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+ 	if optionState.localPassword != "" {
+ 		s.mgmt.SetLocalPassword(optionState.localPassword)
+ 	}
++	if cfg != nil && cfg.PlusManager.Enabled {
++		if optionState.localPassword != "" {
++			s.internalManagementPassword = optionState.localPassword
++		} else {
++			s.internalManagementPassword = generateInternalManagementPassword()
++			s.mgmt.SetLocalPassword(s.internalManagementPassword)
++		}
++	}
+ 	logDir := logging.ResolveLogDirectory(cfg)
+ 	s.mgmt.SetLogDirectory(logDir)
+ 	if optionState.postAuthHook != nil {
+@@ -331,6 +365,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  
  	// Setup routes
  	s.setupRoutes()
++	if cfg != nil && cfg.PlusManager.Enabled {
++		s.initPlusManagerServices()
++	}
 +	plushttpapi.RegisterCompatibilityRoutes(engine, plushttpapi.Options{
-+		Enabled: cfg != nil && cfg.PlusManager.Enabled,
++		Enabled:       cfg != nil && cfg.PlusManager.Enabled,
++		ManagerConfig: s.plusManagerConfig,
++		Auth:          []gin.HandlerFunc{s.managementAvailabilityMiddleware(), s.mgmt.Middleware()},
 +	})
  
  	// Register Amp module using V2 interface with Context
  	s.ampModule = ampmodule.NewLegacy(accessManager, AuthMiddleware(accessManager))
-@@ -353,7 +365,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -353,7 +395,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	// or when a local management password is provided (e.g. TUI mode).
  	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
  	s.managementRoutesEnabled.Store(hasManagementSecret)
@@ -2106,7 +2011,7 @@ index a148dd87..bffaea00 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -593,6 +606,13 @@ func (s *Server) registerManagementRoutes() {
+@@ -593,6 +636,14 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -2117,13 +2022,35 @@ index a148dd87..bffaea00 100644
 +	}
 +	plushttpapi.RegisterRoutes(mgmt.Group("/plus"), plusOptions)
 +	plushttpapi.RegisterModelPriceRoutes(mgmt, plusOptions)
++	plushttpapi.RegisterCodexInspectionRoutes(mgmt, plusOptions)
  	{
  		mgmt.GET("/config", s.mgmt.GetConfig)
  		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
-@@ -777,6 +797,65 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -777,6 +828,111 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
++func (s *Server) initPlusManagerServices() {
++	if s == nil || s.cfg == nil || !s.cfg.PlusManager.Enabled {
++		return
++	}
++	st := s.openPlusStore()
++	if st == nil {
++		return
++	}
++	baseURL := fmt.Sprintf("http://127.0.0.1:%d", s.cfg.Port)
++	key := strings.TrimSpace(s.internalManagementPassword)
++	if key == "" {
++		key = generateInternalManagementPassword()
++		s.internalManagementPassword = key
++		if s.mgmt != nil {
++			s.mgmt.SetLocalPassword(key)
++		}
++	}
++	s.plusManagerConfig = plusmanagerconfig.New(s.cfg, st, baseURL, key)
++	s.plusCodexInspection = pluscodexinspection.New(st, s.plusManagerConfig)
++}
++
 +func (s *Server) openPlusStore() *plusstore.Store {
 +	if s == nil || s.cfg == nil || !s.cfg.PlusManager.Enabled {
 +		return nil
@@ -2183,10 +2110,35 @@ index a148dd87..bffaea00 100644
 +	s.plusCollector = nil
 +}
 +
++func (s *Server) startPlusCodexInspectionWorker() {
++	if s == nil || s.plusCodexWorkerCancel != nil || s.plusCodexInspection == nil || s.openPlusStore() == nil {
++		return
++	}
++	ctx, cancel := context.WithCancel(context.Background())
++	s.plusCodexWorkerCancel = cancel
++	plusworker.NewCodexInspectionWorker(s.openPlusStore(), s.plusCodexInspection).Start(ctx)
++}
++
++func (s *Server) stopPlusCodexInspectionWorker() {
++	if s == nil || s.plusCodexWorkerCancel == nil {
++		return
++	}
++	s.plusCodexWorkerCancel()
++	s.plusCodexWorkerCancel = nil
++}
++
++func generateInternalManagementPassword() string {
++	buf := make([]byte, 32)
++	if _, err := rand.Read(buf); err == nil {
++		return "cpa-plus-internal-" + hex.EncodeToString(buf)
++	}
++	return "cpa-plus-internal-" + fmt.Sprintf("%d", time.Now().UnixNano())
++}
++
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -842,6 +921,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -842,6 +998,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -2198,10 +2150,11 @@ index a148dd87..bffaea00 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1408,6 +1492,13 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1408,6 +1569,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
++	s.stopPlusCodexInspectionWorker()
 +	s.stopPlusCollector(ctx)
 +	if s.plusStore != nil {
 +		if errClose := s.plusStore.Close(); errClose != nil {
@@ -2212,7 +2165,7 @@ index a148dd87..bffaea00 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1518,6 +1609,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1518,6 +1687,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -2221,7 +2174,7 @@ index a148dd87..bffaea00 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1549,10 +1642,14 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1549,10 +1720,14 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -2640,6 +2593,2114 @@ index 00000000..94def912
 +		t.Fatalf("HasBundledManagementHTML() = false, want true")
 +	}
 +}
+diff --git a/internal/plusmanager/codexinspection/service.go b/internal/plusmanager/codexinspection/service.go
+new file mode 100644
+index 00000000..60cb77e3
+--- /dev/null
++++ b/internal/plusmanager/codexinspection/service.go
+@@ -0,0 +1,2102 @@
++package codexinspection
++
++import (
++	"bytes"
++	"context"
++	"encoding/base64"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"io"
++	"math"
++	"math/rand"
++	"net/http"
++	"net/url"
++	"sort"
++	"strings"
++	"sync"
++	"time"
++
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/cpa"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/managerconfig"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/model"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
++)
++
++const (
++	codexUsageURL       = "https://chatgpt.com/backend-api/wham/usage"
++	codexFiveHourWindow = 18_000
++	codexWeekWindow     = 604_800
++	codexMonthWindow    = 2_592_000
++	maxStoredBodyText   = 2048
++)
++
++var (
++	ErrRunAlreadyActive    = errors.New("codex inspection is already running")
++	ErrNotConfigured       = errors.New("usage service is not configured")
++	ErrRunNotFound         = errors.New("codex inspection run not found")
++	ErrRunNotCompleted     = errors.New("codex inspection run is not completed")
++	ErrActionIDsRequired   = errors.New("codex inspection action result ids are required")
++	ErrNoActionableResults = errors.New("codex inspection has no actionable results")
++)
++
++type Service struct {
++	store                *store.Store
++	managerConfigService *managerconfig.Service
++	client               *http.Client
++
++	mu      sync.Mutex
++	running bool
++}
++
++type RunRequest struct {
++	TriggerType string
++	TriggerKey  string
++}
++
++type RunDetail struct {
++	Run     model.CodexInspectionRun      `json:"run"`
++	Results []model.CodexInspectionResult `json:"results"`
++	Logs    []model.CodexInspectionLog    `json:"logs"`
++}
++
++type ExecuteActionsRequest struct {
++	ResultIDs []int64 `json:"resultIds"`
++}
++
++type ActionOutcome struct {
++	ResultID       int64  `json:"resultId,omitempty"`
++	AccountKey     string `json:"accountKey,omitempty"`
++	FileName       string `json:"fileName"`
++	DisplayAccount string `json:"displayAccount"`
++	Action         string `json:"action"`
++	Status         string `json:"status"`
++	Success        bool   `json:"success"`
++	Error          string `json:"error,omitempty"`
++}
++
++type ExecuteActionsResult struct {
++	Outcomes []ActionOutcome `json:"outcomes"`
++	Detail   RunDetail       `json:"detail"`
++}
++
++type authFile map[string]any
++
++type account struct {
++	Key            string
++	FileName       string
++	DisplayAccount string
++	AuthIndex      string
++	AccountID      string
++	Provider       string
++	Disabled       bool
++	Status         string
++	State          string
++	File           authFile
++}
++
++type apiCallResponse struct {
++	StatusCode    int
++	HasStatusCode bool
++	BodyText      string
++	Body          any
++}
++
++type inspectionDecision struct {
++	Action       string
++	ActionReason string
++	UsedPercent  *float64
++	IsQuota      bool
++}
++
++type fileActionGroup struct {
++	FileName string
++	Items    []model.CodexInspectionResult
++	Action   string
++	Mixed    bool
++}
++
++type actionEndpointError struct {
++	Endpoint string
++	Err      error
++}
++
++type unauthorizedReason string
++
++const (
++	unauthorizedReasonUnknown     unauthorizedReason = "unknown"
++	unauthorizedReasonExpired     unauthorizedReason = "expired"
++	unauthorizedReasonInvalidated unauthorizedReason = "invalidated"
++)
++
++const (
++	fileActionDuplicateReason = "CPA 认证文件动作按文件执行，该文件已由另一条结果处理"
++	fileActionMixedReason     = "同一认证文件下存在多个不同建议动作，文件级处理已阻止，请到认证文件管理中手动处理"
++)
++
++type codexRateLimit struct {
++	Allowed         *bool
++	LimitReached    bool
++	PrimaryWindow   *codexWindow
++	SecondaryWindow *codexWindow
++}
++
++type codexWindow struct {
++	UsedPercent        *float64
++	LimitWindowSeconds *float64
++}
++
++type codexClassifiedWindows struct {
++	FiveHour    *codexWindow
++	Weekly      *codexWindow
++	Monthly     *codexWindow
++	GenericLong *codexWindow
++}
++
++func (w codexClassifiedWindows) longWindow() *codexWindow {
++	if w.Weekly != nil {
++		return w.Weekly
++	}
++	if w.Monthly != nil {
++		return w.Monthly
++	}
++	return w.GenericLong
++}
++
++func (w codexClassifiedWindows) longWindowLabel(window *codexWindow) string {
++	switch window {
++	case w.Weekly:
++		return "周额度"
++	case w.Monthly:
++		return "月额度"
++	case w.GenericLong:
++		return "长期额度"
++	default:
++		return "长期额度"
++	}
++}
++
++func New(st *store.Store, managerConfigService *managerconfig.Service, clients ...*http.Client) *Service {
++	client := &http.Client{Timeout: 30 * time.Second}
++	if len(clients) > 0 && clients[0] != nil {
++		client = clients[0]
++	}
++	return &Service{
++		store:                st,
++		managerConfigService: managerConfigService,
++		client:               client,
++	}
++}
++
++func (s *Service) Run(ctx context.Context, req RunRequest) (RunDetail, error) {
++	if err := s.acquireRun(); err != nil {
++		return RunDetail{}, err
++	}
++	defer s.releaseRun()
++
++	settings, setup, err := s.resolveRuntime(ctx)
++	if err != nil {
++		return RunDetail{}, err
++	}
++
++	triggerType := strings.TrimSpace(req.TriggerType)
++	if triggerType == "" {
++		triggerType = model.CodexInspectionTriggerManual
++	}
++	startedAt := time.Now().UnixMilli()
++	run, err := s.store.CreateCodexInspectionRun(ctx, model.CodexInspectionRun{
++		TriggerType:  triggerType,
++		TriggerKey:   strings.TrimSpace(req.TriggerKey),
++		Status:       model.CodexInspectionStatusRunning,
++		StartedAtMS:  startedAt,
++		Settings:     settings,
++		SettingsJSON: model.MarshalCodexInspectionSettings(settings),
++	})
++	if err != nil {
++		return RunDetail{}, err
++	}
++	persistCtx := context.WithoutCancel(ctx)
++
++	logger := runLogger{service: s, runID: run.ID}
++	logger.info(ctx, "Codex 巡检开始", map[string]any{
++		"triggerType": triggerType,
++		"triggerKey":  strings.TrimSpace(req.TriggerKey),
++		"targetType":  settings.TargetType,
++	})
++
++	files, err := s.fetchAuthFiles(ctx, setup)
++	if err != nil {
++		logger.error(persistCtx, "加载认证文件列表失败", map[string]any{"error": err.Error()})
++		return s.failRun(persistCtx, run, err)
++	}
++
++	accounts := make([]account, 0, len(files))
++	for _, file := range files {
++		next := toAccount(file)
++		if next.Provider == settings.TargetType {
++			accounts = append(accounts, next)
++		}
++	}
++	probeSetCount := len(accounts)
++	sampled := pickSample(accounts, settings.SampleSize)
++
++	run.TotalFiles = len(files)
++	run.ProbeSetCount = probeSetCount
++	run.SampledCount = len(sampled)
++	run.DisabledCount = countAccounts(sampled, true)
++	run.EnabledCount = len(sampled) - run.DisabledCount
++	_ = s.store.UpdateCodexInspectionRun(persistCtx, run)
++
++	logger.info(ctx, "Codex 巡检集合已准备", map[string]any{
++		"totalFiles":    len(files),
++		"probeSetCount": probeSetCount,
++		"sampledCount":  len(sampled),
++	})
++
++	results := s.inspectAccounts(ctx, setup, settings, run.ID, sampled, logger)
++	if err := ctx.Err(); err != nil {
++		for _, result := range results {
++			result.RunID = run.ID
++			_, _ = s.store.InsertCodexInspectionResult(persistCtx, result)
++		}
++		run = summarizeRun(run, results)
++		run.Status = model.CodexInspectionStatusFailed
++		run.Error = err.Error()
++		run.FinishedAtMS = time.Now().UnixMilli()
++		if err := s.store.UpdateCodexInspectionRun(persistCtx, run); err != nil {
++			return RunDetail{}, err
++		}
++		logger.warning(persistCtx, "Codex 巡检已取消", map[string]any{"error": run.Error})
++		return s.GetRun(persistCtx, run.ID)
++	}
++
++	results = resolveAutoActionResults(settings.AutoActionMode, results)
++	actionOutcomes := s.executeAutoActions(ctx, setup, settings, results, logger)
++	results = applyActionOutcomes(results, actionOutcomes)
++	for _, result := range results {
++		result.RunID = run.ID
++		_, _ = s.store.InsertCodexInspectionResult(persistCtx, result)
++	}
++	run = summarizeRun(run, results)
++	if failed := countFailedOutcomes(actionOutcomes); failed > 0 {
++		run.Error = fmt.Sprintf("%d 个自动处理动作执行失败，详见巡检日志", failed)
++	}
++	run.Status = model.CodexInspectionStatusCompleted
++	run.FinishedAtMS = time.Now().UnixMilli()
++	if err := s.store.UpdateCodexInspectionRun(persistCtx, run); err != nil {
++		return RunDetail{}, err
++	}
++	logger.success(persistCtx, "Codex 巡检完成", map[string]any{
++		"deleteCount":  run.DeleteCount,
++		"disableCount": run.DisableCount,
++		"enableCount":  run.EnableCount,
++		"keepCount":    run.KeepCount,
++		"actionErrors": failedActionOutcomes(actionOutcomes),
++	})
++	return s.GetRun(persistCtx, run.ID)
++}
++
++func (s *Service) ListRuns(ctx context.Context, limit int) ([]model.CodexInspectionRun, error) {
++	return s.store.ListCodexInspectionRuns(ctx, limit)
++}
++
++func (s *Service) GetRun(ctx context.Context, id int64) (RunDetail, error) {
++	run, ok, err := s.store.GetCodexInspectionRun(ctx, id)
++	if err != nil {
++		return RunDetail{}, err
++	}
++	if !ok {
++		return RunDetail{}, ErrRunNotFound
++	}
++	results, err := s.store.ListCodexInspectionResults(ctx, id)
++	if err != nil {
++		return RunDetail{}, err
++	}
++	logs, err := s.store.ListCodexInspectionLogs(ctx, id)
++	if err != nil {
++		return RunDetail{}, err
++	}
++	return RunDetail{Run: run, Results: results, Logs: logs}, nil
++}
++
++func (s *Service) ExecuteManualActions(ctx context.Context, runID int64, req ExecuteActionsRequest) (ExecuteActionsResult, error) {
++	if err := s.acquireRun(); err != nil {
++		return ExecuteActionsResult{}, err
++	}
++	defer s.releaseRun()
++
++	if len(req.ResultIDs) == 0 {
++		return ExecuteActionsResult{}, ErrActionIDsRequired
++	}
++
++	settings, setup, err := s.resolveRuntime(ctx)
++	if err != nil {
++		return ExecuteActionsResult{}, err
++	}
++	detail, err := s.GetRun(ctx, runID)
++	if err != nil {
++		return ExecuteActionsResult{}, err
++	}
++	if detail.Run.Status != model.CodexInspectionStatusCompleted {
++		return ExecuteActionsResult{}, ErrRunNotCompleted
++	}
++	if detail.Run.Settings.TargetType != "" {
++		settings = detail.Run.Settings
++	}
++
++	selected := map[int64]struct{}{}
++	for _, id := range req.ResultIDs {
++		if id > 0 {
++			selected[id] = struct{}{}
++		}
++	}
++	if len(selected) == 0 {
++		return ExecuteActionsResult{}, ErrActionIDsRequired
++	}
++
++	items, preflightOutcomes := selectManualActionItems(detail.Results, selected)
++	if len(items) == 0 && len(preflightOutcomes) == 0 {
++		return ExecuteActionsResult{}, ErrNoActionableResults
++	}
++
++	persistCtx := context.WithoutCancel(ctx)
++	logger := runLogger{service: s, runID: detail.Run.ID}
++	logger.info(persistCtx, "手动处理账号开始", map[string]any{
++		"requestedCount": len(req.ResultIDs),
++		"actionCount":    len(items),
++	})
++	for _, outcome := range preflightOutcomes {
++		logger.warning(persistCtx, "手动处理账号跳过", map[string]any{
++			"fileName":       outcome.FileName,
++			"displayAccount": outcome.DisplayAccount,
++			"action":         outcome.Action,
++			"reason":         outcome.Error,
++		})
++	}
++
++	validItems, validationOutcomes, err := s.validateManualActionItems(ctx, persistCtx, setup, items, logger)
++	if err != nil {
++		return ExecuteActionsResult{}, err
++	}
++	outcomes := make([]ActionOutcome, 0, len(preflightOutcomes)+len(validationOutcomes)+len(validItems))
++	outcomes = append(outcomes, preflightOutcomes...)
++	outcomes = append(outcomes, validationOutcomes...)
++	outcomes = append(outcomes, s.executeActionItems(ctx, setup, settings, validItems, logger, "手动处理", func(item model.CodexInspectionResult) string {
++		return item.Action
++	})...)
++	if len(outcomes) == 0 {
++		return ExecuteActionsResult{}, ErrNoActionableResults
++	}
++	nextResults := applyActionOutcomes(detail.Results, outcomes)
++	for _, result := range nextResults {
++		result.RunID = detail.Run.ID
++		_, _ = s.store.InsertCodexInspectionResult(persistCtx, result)
++	}
++
++	run := summarizeRun(detail.Run, nextResults)
++	if failed := countFailedOutcomes(outcomes); failed > 0 {
++		run.Error = fmt.Sprintf("%d 个手动处理动作执行失败，详见巡检日志", failed)
++	} else {
++		run.Error = ""
++	}
++	if err := s.store.UpdateCodexInspectionRun(persistCtx, run); err != nil {
++		return ExecuteActionsResult{}, err
++	}
++	logger.success(persistCtx, "手动处理账号完成", map[string]any{
++		"successCount": len(outcomes) - countFailedOutcomes(outcomes),
++		"failedCount":  countFailedOutcomes(outcomes),
++	})
++
++	nextDetail, err := s.GetRun(persistCtx, detail.Run.ID)
++	if err != nil {
++		return ExecuteActionsResult{}, err
++	}
++	return ExecuteActionsResult{Outcomes: outcomes, Detail: nextDetail}, nil
++}
++
++func (s *Service) ResolveConfig(ctx context.Context) (model.ManagerCodexInspectionConfig, bool, error) {
++	managerCfg, _, ok, err := s.managerConfigService.ResolveManagerConfigWithSource(ctx)
++	if err != nil {
++		return model.ManagerCodexInspectionConfig{}, false, err
++	}
++	if !ok || strings.TrimSpace(managerCfg.CPAConnection.CPABaseURL) == "" ||
++		strings.TrimSpace(managerCfg.CPAConnection.ManagementKey) == "" {
++		return model.DefaultCodexInspectionConfig(), false, nil
++	}
++	return model.NormalizeCodexInspectionConfig(
++		managerCfg.CodexInspection,
++		model.DefaultCodexInspectionConfig(),
++	), true, nil
++}
++
++func (s *Service) acquireRun() error {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	if s.running {
++		return ErrRunAlreadyActive
++	}
++	s.running = true
++	return nil
++}
++
++func (s *Service) releaseRun() {
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	s.running = false
++}
++
++func (s *Service) resolveRuntime(ctx context.Context) (model.ManagerCodexInspectionConfig, store.Setup, error) {
++	managerCfg, setup, ok, err := s.managerConfigService.ResolveRuntime(ctx)
++	if err != nil {
++		return model.ManagerCodexInspectionConfig{}, store.Setup{}, err
++	}
++	if !ok || strings.TrimSpace(setup.CPAUpstreamURL) == "" || strings.TrimSpace(setup.ManagementKey) == "" {
++		return model.ManagerCodexInspectionConfig{}, store.Setup{}, ErrNotConfigured
++	}
++	settings := model.NormalizeCodexInspectionConfig(
++		managerCfg.CodexInspection,
++		model.DefaultCodexInspectionConfig(),
++	)
++	return settings, setup, nil
++}
++
++func (s *Service) failRun(ctx context.Context, run model.CodexInspectionRun, cause error) (RunDetail, error) {
++	run.Status = model.CodexInspectionStatusFailed
++	run.Error = cause.Error()
++	run.FinishedAtMS = time.Now().UnixMilli()
++	_ = s.store.UpdateCodexInspectionRun(ctx, run)
++	detail, err := s.GetRun(ctx, run.ID)
++	if err != nil {
++		return RunDetail{}, err
++	}
++	return detail, cause
++}
++
++func (s *Service) fetchAuthFiles(ctx context.Context, setup store.Setup) ([]authFile, error) {
++	files, status, err := s.fetchAuthFilesAt(ctx, setup, "/auth-files")
++	if err == nil {
++		return files, nil
++	}
++	if status == http.StatusNotFound || status == http.StatusMethodNotAllowed {
++		files, _, err := s.fetchAuthFilesAt(ctx, setup, "/v0/management/auth-files")
++		return files, err
++	}
++	return nil, err
++}
++
++func (s *Service) fetchAuthFilesAt(ctx context.Context, setup store.Setup, path string) ([]authFile, int, error) {
++	req, err := http.NewRequestWithContext(
++		ctx,
++		http.MethodGet,
++		cpa.NormalizeBaseURL(setup.CPAUpstreamURL)+path,
++		nil,
++	)
++	if err != nil {
++		return nil, 0, err
++	}
++	req.Header.Set("Authorization", "Bearer "+setup.ManagementKey)
++	res, err := s.client.Do(req)
++	if err != nil {
++		return nil, 0, err
++	}
++	defer res.Body.Close()
++	body, _ := io.ReadAll(io.LimitReader(res.Body, 8*1024*1024))
++	if res.StatusCode < 200 || res.StatusCode >= 300 {
++		return nil, res.StatusCode, fmt.Errorf("auth files request failed: %s %s", res.Status, truncate(string(body), maxStoredBodyText))
++	}
++	var payload struct {
++		Files []authFile `json:"files"`
++	}
++	if err := json.Unmarshal(body, &payload); err != nil {
++		return nil, res.StatusCode, err
++	}
++	return payload.Files, res.StatusCode, nil
++}
++
++func (s *Service) inspectAccounts(
++	ctx context.Context,
++	setup store.Setup,
++	settings model.ManagerCodexInspectionConfig,
++	runID int64,
++	accounts []account,
++	logger runLogger,
++) []model.CodexInspectionResult {
++	if len(accounts) == 0 {
++		return nil
++	}
++	workers := settings.Workers
++	if workers <= 0 {
++		workers = 1
++	}
++
++	jobs := make(chan account)
++	results := make(chan model.CodexInspectionResult, len(accounts))
++	var wg sync.WaitGroup
++	for i := 0; i < workers && i < len(accounts); i++ {
++		wg.Add(1)
++		go func() {
++			defer wg.Done()
++			for item := range jobs {
++				result := s.inspectSingleAccount(ctx, setup, settings, item, logger)
++				result.RunID = runID
++				if _, err := s.store.InsertCodexInspectionResult(ctx, result); err != nil {
++					logger.error(ctx, "写入巡检账号结果失败", map[string]any{
++						"fileName": item.FileName,
++						"error":    err.Error(),
++					})
++				}
++				results <- result
++			}
++		}()
++	}
++
++	go func() {
++		defer close(jobs)
++		for _, item := range accounts {
++			select {
++			case <-ctx.Done():
++				return
++			case jobs <- item:
++			}
++		}
++	}()
++
++	wg.Wait()
++	close(results)
++
++	out := make([]model.CodexInspectionResult, 0, len(accounts))
++	for result := range results {
++		out = append(out, result)
++	}
++	sort.Slice(out, func(i, j int) bool {
++		if out[i].FileName == out[j].FileName {
++			return out[i].DisplayAccount < out[j].DisplayAccount
++		}
++		return out[i].FileName < out[j].FileName
++	})
++	return out
++}
++
++func (s *Service) inspectSingleAccount(
++	ctx context.Context,
++	setup store.Setup,
++	settings model.ManagerCodexInspectionConfig,
++	item account,
++	logger runLogger,
++) model.CodexInspectionResult {
++	base := resultFromAccount(item)
++	if item.AuthIndex == "" {
++		base.Action = "keep"
++		base.ActionReason = "缺少 auth_index，保留账号"
++		base.Error = "缺少 auth_index"
++		logger.warning(ctx, "账号缺少 auth_index，跳过探测", map[string]any{
++			"fileName":       item.FileName,
++			"displayAccount": item.DisplayAccount,
++		})
++		return base
++	}
++
++	var response apiCallResponse
++	var err error
++	for attempt := 0; attempt <= settings.Retries; attempt++ {
++		response, err = s.requestCodexUsage(ctx, setup, settings, item)
++		if err == nil {
++			break
++		}
++	}
++	if err != nil {
++		base.Action = "keep"
++		base.ActionReason = "探测异常，保留账号"
++		base.Error = err.Error()
++		logger.warning(ctx, "账号探测异常，保留账号", map[string]any{
++			"fileName":       item.FileName,
++			"displayAccount": item.DisplayAccount,
++			"error":          err.Error(),
++		})
++		return base
++	}
++	if !response.HasStatusCode {
++		base.Action = "keep"
++		base.ActionReason = "探测响应缺少 status_code，保留账号"
++		base.Error = "响应缺少 status_code"
++		logger.warning(ctx, "账号探测未返回 status_code，保留账号", map[string]any{
++			"fileName":       item.FileName,
++			"displayAccount": item.DisplayAccount,
++			"body":           truncate(response.BodyText, maxStoredBodyText),
++		})
++		return base
++	}
++
++	statusCode := response.StatusCode
++	base.StatusCode = &statusCode
++	payload := parseRecord(response.Body)
++	if payload == nil {
++		payload = parseRecord(response.BodyText)
++	}
++	rateLimit := parseRateLimit(readMap(payload, "rate_limit", "rateLimit"))
++	usedPercent := deriveRateLimitUsedPercent(rateLimit)
++	bodyLower := strings.ToLower(response.BodyText)
++	isQuota := statusCode == http.StatusPaymentRequired ||
++		strings.Contains(bodyLower, "quota exhausted") ||
++		strings.Contains(bodyLower, "limit reached") ||
++		strings.Contains(bodyLower, "payment_required") ||
++		isRateLimitReached(rateLimit) ||
++		(usedPercent != nil && *usedPercent >= settings.UsedPercentThreshold)
++	decision := resolveProbeAction(item, statusCode, response.BodyText, rateLimit, usedPercent, isQuota, settings.UsedPercentThreshold)
++
++	base.Action = decision.Action
++	base.ActionReason = decision.ActionReason
++	base.UsedPercent = decision.UsedPercent
++	base.IsQuota = decision.IsQuota
++	base.Error = ""
++
++	level := "info"
++	switch decision.Action {
++	case "delete":
++		level = "error"
++	case "disable":
++		level = "warning"
++	case "enable":
++		level = "success"
++	}
++	logger.log(ctx, level, "账号探测完成", map[string]any{
++		"fileName":       item.FileName,
++		"displayAccount": item.DisplayAccount,
++		"action":         decision.Action,
++		"statusCode":     statusCode,
++		"usedPercent":    nullableFloat(decision.UsedPercent),
++		"isQuota":        decision.IsQuota,
++	})
++	return base
++}
++
++func (s *Service) requestCodexUsage(
++	ctx context.Context,
++	setup store.Setup,
++	settings model.ManagerCodexInspectionConfig,
++	item account,
++) (apiCallResponse, error) {
++	result, status, err := s.requestCodexUsageAt(ctx, setup, settings, item, "/api-call")
++	if err == nil {
++		return result, nil
++	}
++	if status == http.StatusNotFound || status == http.StatusMethodNotAllowed {
++		result, _, err := s.requestCodexUsageAt(ctx, setup, settings, item, "/v0/management/api-call")
++		return result, err
++	}
++	return apiCallResponse{}, err
++}
++
++func (s *Service) requestCodexUsageAt(
++	ctx context.Context,
++	setup store.Setup,
++	settings model.ManagerCodexInspectionConfig,
++	item account,
++	path string,
++) (apiCallResponse, int, error) {
++	headers := map[string]string{
++		"Authorization": "Bearer $TOKEN$",
++		"Content-Type":  "application/json",
++		"User-Agent":    settings.UserAgent,
++	}
++	if strings.TrimSpace(item.AccountID) != "" {
++		headers["Chatgpt-Account-Id"] = strings.TrimSpace(item.AccountID)
++	}
++	payload := map[string]any{
++		"authIndex": item.AuthIndex,
++		"method":    http.MethodGet,
++		"url":       codexUsageURL,
++		"header":    headers,
++	}
++	data, err := json.Marshal(payload)
++	if err != nil {
++		return apiCallResponse{}, 0, err
++	}
++	requestCtx := ctx
++	cancel := func() {}
++	if settings.Timeout > 0 {
++		requestCtx, cancel = context.WithTimeout(ctx, time.Duration(settings.Timeout)*time.Millisecond)
++	}
++	defer cancel()
++
++	req, err := http.NewRequestWithContext(
++		requestCtx,
++		http.MethodPost,
++		cpa.NormalizeBaseURL(setup.CPAUpstreamURL)+path,
++		bytes.NewReader(data),
++	)
++	if err != nil {
++		return apiCallResponse{}, 0, err
++	}
++	req.Header.Set("Authorization", "Bearer "+setup.ManagementKey)
++	req.Header.Set("Content-Type", "application/json")
++	res, err := s.client.Do(req)
++	if err != nil {
++		return apiCallResponse{}, 0, err
++	}
++	defer res.Body.Close()
++	body, _ := io.ReadAll(io.LimitReader(res.Body, 8*1024*1024))
++	if res.StatusCode < 200 || res.StatusCode >= 300 {
++		return apiCallResponse{}, res.StatusCode, fmt.Errorf("api-call failed: %s %s", res.Status, truncate(string(body), maxStoredBodyText))
++	}
++
++	var raw map[string]any
++	if err := json.Unmarshal(body, &raw); err != nil {
++		return apiCallResponse{}, res.StatusCode, err
++	}
++	statusRaw, hasStatus := firstValue(raw, "status_code", "statusCode")
++	statusCode := int(readFloat(statusRaw, 0))
++	bodyRaw, _ := firstValue(raw, "body")
++	bodyText, bodyValue := normalizeBody(bodyRaw)
++	return apiCallResponse{
++		StatusCode:    statusCode,
++		HasStatusCode: hasStatus && strings.TrimSpace(fmt.Sprint(statusRaw)) != "",
++		BodyText:      bodyText,
++		Body:          bodyValue,
++	}, res.StatusCode, nil
++}
++
++func (s *Service) executeAutoActions(
++	ctx context.Context,
++	setup store.Setup,
++	settings model.ManagerCodexInspectionConfig,
++	results []model.CodexInspectionResult,
++	logger runLogger,
++) []ActionOutcome {
++	mode := model.NormalizeCodexInspectionAutoActionMode(settings.AutoActionMode, model.CodexInspectionAutoActionNone)
++	items, preflightOutcomes := selectAutoActionItems(mode, results)
++	if len(items) == 0 {
++		return preflightOutcomes
++	}
++	outcomes := make([]ActionOutcome, 0, len(preflightOutcomes)+len(items))
++	outcomes = append(outcomes, preflightOutcomes...)
++	outcomes = append(outcomes, s.executeActionItems(ctx, setup, settings, items, logger, "自动处理", func(item model.CodexInspectionResult) string {
++		return resolveExecutableAction(mode, item.Action)
++	})...)
++	return outcomes
++}
++
++func (s *Service) executeActionItems(
++	ctx context.Context,
++	setup store.Setup,
++	settings model.ManagerCodexInspectionConfig,
++	items []model.CodexInspectionResult,
++	logger runLogger,
++	logPrefix string,
++	actionFor func(model.CodexInspectionResult) string,
++) []ActionOutcome {
++	workers := settings.DeleteWorkers
++	if workers <= 0 {
++		workers = 1
++	}
++	jobs := make(chan model.CodexInspectionResult)
++	outcomes := make(chan ActionOutcome, len(items))
++	var wg sync.WaitGroup
++	for i := 0; i < workers && i < len(items); i++ {
++		wg.Add(1)
++		go func() {
++			defer wg.Done()
++			for {
++				select {
++				case <-ctx.Done():
++					return
++				case item, ok := <-jobs:
++					if !ok {
++						return
++					}
++					action := item.Action
++					if actionFor != nil {
++						action = actionFor(item)
++					}
++					if action == "" {
++						action = item.Action
++					}
++					actionItem := item
++					actionItem.Action = action
++					outcome := ActionOutcome{
++						ResultID:       item.ID,
++						AccountKey:     item.AccountKey,
++						FileName:       item.FileName,
++						DisplayAccount: item.DisplayAccount,
++						Action:         action,
++					}
++					if err := s.executeAction(ctx, setup, actionItem); err != nil {
++						outcome.Success = false
++						outcome.Status = model.CodexInspectionActionStatusFailed
++						outcome.Error = err.Error()
++						outcomes <- outcome
++						logger.error(ctx, logPrefix+"账号失败", map[string]any{
++							"fileName":       item.FileName,
++							"displayAccount": item.DisplayAccount,
++							"action":         action,
++							"error":          err.Error(),
++						})
++						continue
++					}
++					outcome.Success = true
++					outcome.Status = model.CodexInspectionActionStatusSuccess
++					outcomes <- outcome
++					logger.success(ctx, logPrefix+"账号成功", map[string]any{
++						"fileName":       item.FileName,
++						"displayAccount": item.DisplayAccount,
++						"action":         action,
++					})
++				}
++			}
++		}()
++	}
++	for _, item := range items {
++		select {
++		case <-ctx.Done():
++			close(jobs)
++			wg.Wait()
++			close(outcomes)
++			return collectActionOutcomes(outcomes, len(items))
++		case jobs <- item:
++		}
++	}
++	close(jobs)
++	wg.Wait()
++	close(outcomes)
++
++	return collectActionOutcomes(outcomes, len(items))
++}
++
++func collectActionOutcomes(outcomes <-chan ActionOutcome, capacity int) []ActionOutcome {
++	result := make([]ActionOutcome, 0, capacity)
++	for outcome := range outcomes {
++		result = append(result, outcome)
++	}
++	sort.Slice(result, func(i, j int) bool {
++		if result[i].FileName == result[j].FileName {
++			return result[i].Action < result[j].Action
++		}
++		return result[i].FileName < result[j].FileName
++	})
++	return result
++}
++
++func (s *Service) executeAction(ctx context.Context, setup store.Setup, item model.CodexInspectionResult) error {
++	switch item.Action {
++	case "delete":
++		if err, status := s.deleteAuthFile(ctx, setup, "/auth-files", item.FileName); err != nil {
++			if shouldFallbackManagement(status) {
++				return s.deleteAuthFileOnly(ctx, setup, "/v0/management/auth-files", item.FileName)
++			}
++			return err
++		}
++		return nil
++	case "disable", "enable":
++		disabled := item.Action == "disable"
++		payload := map[string]any{"name": item.FileName, "disabled": disabled}
++		primaryErr, primaryStatus := s.patchAuthFile(ctx, setup, "/auth-files", payload)
++		if primaryErr == nil {
++			return nil
++		}
++		statusErr, statusCode := s.patchAuthFile(ctx, setup, "/auth-files/status", payload)
++		if statusErr == nil {
++			return nil
++		}
++		if shouldFallbackManagement(primaryStatus) && shouldFallbackManagement(statusCode) {
++			managementErr, _ := s.patchAuthFile(ctx, setup, "/v0/management/auth-files", payload)
++			if managementErr == nil {
++				return nil
++			}
++			managementStatusErr, _ := s.patchAuthFile(ctx, setup, "/v0/management/auth-files/status", payload)
++			if managementStatusErr == nil {
++				return nil
++			}
++			return combineActionEndpointErrors(
++				actionEndpointError{Endpoint: "/auth-files", Err: primaryErr},
++				actionEndpointError{Endpoint: "/auth-files/status", Err: statusErr},
++				actionEndpointError{Endpoint: "/v0/management/auth-files", Err: managementErr},
++				actionEndpointError{Endpoint: "/v0/management/auth-files/status", Err: managementStatusErr},
++			)
++		}
++		return combineActionEndpointErrors(
++			actionEndpointError{Endpoint: "/auth-files", Err: primaryErr},
++			actionEndpointError{Endpoint: "/auth-files/status", Err: statusErr},
++		)
++	default:
++		return nil
++	}
++}
++
++func (s *Service) deleteAuthFileOnly(ctx context.Context, setup store.Setup, path string, fileName string) error {
++	err, _ := s.deleteAuthFile(ctx, setup, path, fileName)
++	return err
++}
++
++func (s *Service) deleteAuthFile(ctx context.Context, setup store.Setup, path string, fileName string) (error, int) {
++	endpoint := cpa.NormalizeBaseURL(setup.CPAUpstreamURL) + path + "?name=" + url.QueryEscape(fileName)
++	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, endpoint, nil)
++	if err != nil {
++		return err, 0
++	}
++	return s.doCPAAction(req, setup.ManagementKey)
++}
++
++func (s *Service) patchAuthFileOnly(ctx context.Context, setup store.Setup, path string, payload map[string]any) error {
++	err, _ := s.patchAuthFile(ctx, setup, path, payload)
++	return err
++}
++
++func combineActionEndpointErrors(items ...actionEndpointError) error {
++	parts := make([]string, 0, len(items))
++	for _, item := range items {
++		if item.Err == nil {
++			continue
++		}
++		parts = append(parts, fmt.Sprintf("%s: %v", item.Endpoint, item.Err))
++	}
++	if len(parts) == 0 {
++		return nil
++	}
++	return errors.New(strings.Join(parts, "; "))
++}
++
++func (s *Service) patchAuthFile(ctx context.Context, setup store.Setup, path string, payload map[string]any) (error, int) {
++	data, err := json.Marshal(payload)
++	if err != nil {
++		return err, 0
++	}
++	req, err := http.NewRequestWithContext(
++		ctx,
++		http.MethodPatch,
++		cpa.NormalizeBaseURL(setup.CPAUpstreamURL)+path,
++		bytes.NewReader(data),
++	)
++	if err != nil {
++		return err, 0
++	}
++	req.Header.Set("Content-Type", "application/json")
++	return s.doCPAAction(req, setup.ManagementKey)
++}
++
++func (s *Service) doCPAAction(req *http.Request, managementKey string) (error, int) {
++	req.Header.Set("Authorization", "Bearer "+managementKey)
++	res, err := s.client.Do(req)
++	if err != nil {
++		return err, 0
++	}
++	defer res.Body.Close()
++	body, _ := io.ReadAll(io.LimitReader(res.Body, 1024*1024))
++	if res.StatusCode < 200 || res.StatusCode >= 300 {
++		return fmt.Errorf("%s %s", res.Status, truncate(string(body), maxStoredBodyText)), res.StatusCode
++	}
++	var payload map[string]any
++	if err := json.Unmarshal(body, &payload); err == nil {
++		if failed, ok := payload["failed"].([]any); ok && len(failed) > 0 {
++			return fmt.Errorf("CPA action failed: %s", truncate(fmt.Sprint(failed[0]), maxStoredBodyText)), res.StatusCode
++		}
++	}
++	return nil, res.StatusCode
++}
++
++func shouldFallbackManagement(status int) bool {
++	return status == http.StatusNotFound || status == http.StatusMethodNotAllowed
++}
++
++type runLogger struct {
++	service *Service
++	runID   int64
++}
++
++func (l runLogger) info(ctx context.Context, message string, detail any) {
++	l.log(ctx, "info", message, detail)
++}
++
++func (l runLogger) success(ctx context.Context, message string, detail any) {
++	l.log(ctx, "success", message, detail)
++}
++
++func (l runLogger) warning(ctx context.Context, message string, detail any) {
++	l.log(ctx, "warning", message, detail)
++}
++
++func (l runLogger) error(ctx context.Context, message string, detail any) {
++	l.log(ctx, "error", message, detail)
++}
++
++func (l runLogger) log(ctx context.Context, level string, message string, detail any) {
++	if l.service == nil || l.runID <= 0 {
++		return
++	}
++	_, _ = l.service.store.InsertCodexInspectionLog(ctx, model.CodexInspectionLog{
++		RunID:   l.runID,
++		Level:   level,
++		Message: message,
++		Detail:  sanitizeDetail(detail),
++	})
++}
++
++func resolveProbeAction(item account, statusCode int, bodyText string, rateLimit *codexRateLimit, usedPercent *float64, isQuota bool, threshold float64) inspectionDecision {
++	if decision := resolveWindowAwareProbeAction(item, statusCode, bodyText, rateLimit, threshold); decision != nil {
++		return *decision
++	}
++	return resolveLegacyProbeAction(item, statusCode, bodyText, usedPercent, isQuota, threshold)
++}
++
++func resolveWindowAwareProbeAction(item account, statusCode int, bodyText string, rateLimit *codexRateLimit, threshold float64) *inspectionDecision {
++	if rateLimit == nil {
++		return nil
++	}
++	classified := classifyWindows(rateLimit)
++	longWindow := classified.longWindow()
++	if longWindow == nil || longWindow.UsedPercent == nil {
++		return nil
++	}
++	longWindowUsedPercent := *longWindow.UsedPercent
++	longWindowLabel := classified.longWindowLabel(longWindow)
++	fiveHour := classified.FiveHour
++	fiveHourOverThreshold := fiveHour != nil && fiveHour.UsedPercent != nil && *fiveHour.UsedPercent >= threshold
++
++	if statusCode == http.StatusUnauthorized {
++		decision := resolveUnauthorizedProbeAction(bodyText, ptrFloat(longWindowUsedPercent))
++		return &decision
++	}
++	if longWindowUsedPercent >= threshold {
++		if item.Disabled {
++			return &inspectionDecision{
++				Action:       "keep",
++				ActionReason: fmt.Sprintf("%s达到阈值，但账号已禁用", longWindowLabel),
++				UsedPercent:  ptrFloat(longWindowUsedPercent),
++				IsQuota:      true,
++			}
++		}
++		return &inspectionDecision{
++			Action:       "disable",
++			ActionReason: fmt.Sprintf("%s达到阈值，建议禁用账号", longWindowLabel),
++			UsedPercent:  ptrFloat(longWindowUsedPercent),
++			IsQuota:      true,
++		}
++	}
++	if item.Disabled {
++		reason := fmt.Sprintf("%s仍可用，建议立即启用账号", longWindowLabel)
++		if fiveHourOverThreshold {
++			reason = fmt.Sprintf("5 小时额度达到阈值，但%s仍可用，建议立即启用账号", longWindowLabel)
++		}
++		return &inspectionDecision{
++			Action:       "enable",
++			ActionReason: reason,
++			UsedPercent:  ptrFloat(longWindowUsedPercent),
++			IsQuota:      false,
++		}
++	}
++	if fiveHourOverThreshold {
++		return &inspectionDecision{
++			Action:       "keep",
++			ActionReason: fmt.Sprintf("5 小时额度达到阈值，但%s仍可用，暂不禁用账号", longWindowLabel),
++			UsedPercent:  ptrFloat(longWindowUsedPercent),
++			IsQuota:      false,
++		}
++	}
++	return &inspectionDecision{
++		Action:       "keep",
++		ActionReason: fmt.Sprintf("%s仍可用，无需处理", longWindowLabel),
++		UsedPercent:  ptrFloat(longWindowUsedPercent),
++		IsQuota:      false,
++	}
++}
++
++func resolveLegacyProbeAction(item account, statusCode int, bodyText string, usedPercent *float64, isQuota bool, threshold float64) inspectionDecision {
++	overThreshold := usedPercent != nil && *usedPercent >= threshold
++	if statusCode == http.StatusUnauthorized {
++		return resolveUnauthorizedProbeAction(bodyText, usedPercent)
++	}
++	if isQuota || overThreshold {
++		if item.Disabled {
++			reason := "额度已耗尽，但账号已禁用"
++			if overThreshold {
++				reason = "额度超阈值，但账号已禁用"
++			}
++			return inspectionDecision{Action: "keep", ActionReason: reason, UsedPercent: usedPercent, IsQuota: isQuota}
++		}
++		reason := "额度已耗尽，建议禁用账号"
++		if overThreshold {
++			reason = "额度超阈值，建议禁用账号"
++		}
++		return inspectionDecision{Action: "disable", ActionReason: reason, UsedPercent: usedPercent, IsQuota: isQuota}
++	}
++	if statusCode == http.StatusOK && item.Disabled {
++		return inspectionDecision{
++			Action:       "enable",
++			ActionReason: "账号恢复健康，建议重新启用",
++			UsedPercent:  usedPercent,
++			IsQuota:      false,
++		}
++	}
++	return inspectionDecision{Action: "keep", ActionReason: "无需处理", UsedPercent: usedPercent, IsQuota: false}
++}
++
++func resolveUnauthorizedProbeAction(bodyText string, usedPercent *float64) inspectionDecision {
++	switch classifyUnauthorizedReason(bodyText) {
++	case unauthorizedReasonExpired:
++		return inspectionDecision{
++			Action:       "reauth",
++			ActionReason: "接口返回 401，登录已过期，建议重新登录账号",
++			UsedPercent:  usedPercent,
++			IsQuota:      false,
++		}
++	case unauthorizedReasonInvalidated:
++		return inspectionDecision{
++			Action:       "delete",
++			ActionReason: "接口返回 401，认证令牌已失效，建议删除账号",
++			UsedPercent:  usedPercent,
++			IsQuota:      false,
++		}
++	default:
++		return inspectionDecision{
++			Action:       "delete",
++			ActionReason: "接口返回 401，建议删除失效账号",
++			UsedPercent:  usedPercent,
++			IsQuota:      false,
++		}
++	}
++}
++
++func classifyUnauthorizedReason(bodyText string) unauthorizedReason {
++	normalized := strings.ToLower(strings.TrimSpace(bodyText))
++	switch {
++	case strings.Contains(normalized, "provided authentication token is expired") ||
++		strings.Contains(normalized, "authentication token is expired") ||
++		strings.Contains(normalized, "token is expired"):
++		return unauthorizedReasonExpired
++	case strings.Contains(normalized, "authentication token has been invalidated") ||
++		strings.Contains(normalized, "token has been invalidated") ||
++		strings.Contains(normalized, "token is invalidated"):
++		return unauthorizedReasonInvalidated
++	default:
++		return unauthorizedReasonUnknown
++	}
++}
++
++func resolveAutoActionResults(mode string, results []model.CodexInspectionResult) []model.CodexInspectionResult {
++	mode = model.NormalizeCodexInspectionAutoActionMode(mode, model.CodexInspectionAutoActionNone)
++	if mode == model.CodexInspectionAutoActionNone {
++		return results
++	}
++	out := make([]model.CodexInspectionResult, len(results))
++	copy(out, results)
++	return out
++}
++
++func resolveExecutableAction(mode string, action string) string {
++	if mode == model.CodexInspectionAutoActionDisable && action == "delete" {
++		return "disable"
++	}
++	return action
++}
++
++func selectAutoActionItems(mode string, results []model.CodexInspectionResult) ([]model.CodexInspectionResult, []ActionOutcome) {
++	mode = model.NormalizeCodexInspectionAutoActionMode(mode, model.CodexInspectionAutoActionNone)
++	if mode == model.CodexInspectionAutoActionNone {
++		return nil, nil
++	}
++
++	items := make([]model.CodexInspectionResult, 0)
++	outcomes := make([]ActionOutcome, 0)
++	for _, group := range buildExecutableFileActionGroups(results) {
++		if group.Mixed {
++			for _, result := range group.Items {
++				outcomes = append(outcomes, needsReviewActionOutcome(result, result.Action, fileActionMixedReason))
++			}
++			continue
++		}
++		if len(group.Items) == 0 || !allowAutoAction(mode, group.Items[0]) {
++			continue
++		}
++		items = append(items, group.Items[0])
++		for _, result := range group.Items[1:] {
++			outcomes = append(outcomes, skippedActionOutcome(result, result.Action, fileActionDuplicateReason))
++		}
++	}
++	return items, outcomes
++}
++
++func buildExecutableFileActionGroups(results []model.CodexInspectionResult) []fileActionGroup {
++	groupOrder := make([]string, 0)
++	groupsByFileName := map[string]*fileActionGroup{}
++	for _, result := range results {
++		if !isExecutableInspectionAction(result.Action) {
++			continue
++		}
++		fileName := strings.TrimSpace(result.FileName)
++		if fileName == "" {
++			continue
++		}
++		group, ok := groupsByFileName[fileName]
++		if !ok {
++			group = &fileActionGroup{FileName: fileName, Action: result.Action}
++			groupsByFileName[fileName] = group
++			groupOrder = append(groupOrder, fileName)
++		}
++		if result.Action != group.Action {
++			group.Mixed = true
++		}
++		group.Items = append(group.Items, result)
++	}
++	groups := make([]fileActionGroup, 0, len(groupOrder))
++	for _, fileName := range groupOrder {
++		groups = append(groups, *groupsByFileName[fileName])
++	}
++	return groups
++}
++
++func allowAutoAction(mode string, result model.CodexInspectionResult) bool {
++	switch mode {
++	case model.CodexInspectionAutoActionEnable:
++		return result.Action == "enable"
++	case model.CodexInspectionAutoActionDisable:
++		return result.Action == "enable" || result.Action == "disable" || result.Action == "delete"
++	case model.CodexInspectionAutoActionDelete:
++		return result.Action == "enable" || result.Action == "disable" || result.Action == "delete"
++	default:
++		return false
++	}
++}
++
++func selectManualActionItems(
++	results []model.CodexInspectionResult,
++	selected map[int64]struct{},
++) ([]model.CodexInspectionResult, []ActionOutcome) {
++	items := make([]model.CodexInspectionResult, 0, len(selected))
++	outcomes := make([]ActionOutcome, 0)
++	seenFileNames := map[string]struct{}{}
++	groupByFileName := map[string]fileActionGroup{}
++	for _, group := range buildExecutableFileActionGroups(results) {
++		groupByFileName[group.FileName] = group
++	}
++	for _, result := range results {
++		if _, ok := selected[result.ID]; !ok {
++			continue
++		}
++		fileName := strings.TrimSpace(result.FileName)
++		if !isExecutableInspectionAction(result.Action) {
++			outcomes = append(outcomes, skippedActionOutcome(result, result.Action, "该巡检结果不是可执行动作"))
++			continue
++		}
++		switch model.NormalizeCodexInspectionActionStatus(result.ActionStatus, result.Action) {
++		case model.CodexInspectionActionStatusSuccess:
++			outcomes = append(outcomes, skippedActionOutcome(result, result.Action, "该建议动作已执行成功"))
++			continue
++		case model.CodexInspectionActionStatusSkipped:
++			outcomes = append(outcomes, skippedActionOutcome(result, result.Action, "该建议动作已跳过"))
++			continue
++		case model.CodexInspectionActionStatusNeedsReview:
++			outcomes = append(outcomes, needsReviewActionOutcome(result, result.Action, "该建议动作需要到认证文件管理中人工处理"))
++			continue
++		}
++		if fileName == "" {
++			outcomes = append(outcomes, failedActionOutcome(result, result.Action, "认证文件名为空，无法执行"))
++			continue
++		}
++		group, ok := groupByFileName[fileName]
++		if ok && group.Mixed {
++			outcomes = append(outcomes, needsReviewActionOutcome(result, result.Action, fileActionMixedReason))
++			continue
++		}
++		if ok && len(group.Items) > 0 && group.Items[0].ID != result.ID {
++			outcomes = append(outcomes, skippedActionOutcome(result, result.Action, "CPA 认证文件动作按文件执行，该文件已有另一条结果作为可执行项"))
++			continue
++		}
++		if _, ok := seenFileNames[fileName]; ok {
++			outcomes = append(outcomes, skippedActionOutcome(result, result.Action, "CPA 认证文件动作按文件执行，同名文件已由另一条结果处理"))
++			continue
++		}
++		seenFileNames[fileName] = struct{}{}
++		items = append(items, result)
++	}
++	return items, outcomes
++}
++
++func isExecutableInspectionAction(action string) bool {
++	return action == "delete" || action == "disable" || action == "enable"
++}
++
++func (s *Service) validateManualActionItems(
++	ctx context.Context,
++	logCtx context.Context,
++	setup store.Setup,
++	items []model.CodexInspectionResult,
++	logger runLogger,
++) ([]model.CodexInspectionResult, []ActionOutcome, error) {
++	if len(items) == 0 {
++		return nil, nil, nil
++	}
++	files, err := s.fetchAuthFiles(ctx, setup)
++	if err != nil {
++		return nil, nil, err
++	}
++	currentByFile := map[string][]account{}
++	for _, file := range files {
++		item := toAccount(file)
++		currentByFile[item.FileName] = append(currentByFile[item.FileName], item)
++	}
++
++	validItems := make([]model.CodexInspectionResult, 0, len(items))
++	outcomes := make([]ActionOutcome, 0)
++	for _, item := range items {
++		current, ok := matchCurrentAccount(currentByFile[item.FileName], item)
++		if !ok {
++			outcome := failedActionOutcome(item, item.Action, "认证文件不存在或账号标识已变化，已拒绝执行")
++			outcomes = append(outcomes, outcome)
++			logger.warning(logCtx, "手动处理账号校验失败", map[string]any{
++				"fileName":       item.FileName,
++				"displayAccount": item.DisplayAccount,
++				"authIndex":      item.AuthIndex,
++				"accountId":      item.AccountID,
++				"error":          outcome.Error,
++			})
++			continue
++		}
++		if item.Action == "disable" && current.Disabled {
++			outcome := skippedActionOutcome(item, item.Action, "账号已是禁用状态，未重复执行")
++			outcomes = append(outcomes, outcome)
++			logger.info(logCtx, "手动处理账号跳过", map[string]any{
++				"fileName":       item.FileName,
++				"displayAccount": item.DisplayAccount,
++				"action":         item.Action,
++				"reason":         outcome.Error,
++			})
++			continue
++		}
++		if item.Action == "enable" && !current.Disabled {
++			outcome := skippedActionOutcome(item, item.Action, "账号已是启用状态，未重复执行")
++			outcomes = append(outcomes, outcome)
++			logger.info(logCtx, "手动处理账号跳过", map[string]any{
++				"fileName":       item.FileName,
++				"displayAccount": item.DisplayAccount,
++				"action":         item.Action,
++				"reason":         outcome.Error,
++			})
++			continue
++		}
++		validItems = append(validItems, item)
++	}
++	return validItems, outcomes, nil
++}
++
++func matchCurrentAccount(candidates []account, result model.CodexInspectionResult) (account, bool) {
++	if len(candidates) == 0 {
++		return account{}, false
++	}
++	authIndex := strings.TrimSpace(result.AuthIndex)
++	accountID := strings.TrimSpace(result.AccountID)
++	if authIndex == "" && accountID == "" {
++		return candidates[0], true
++	}
++	for _, candidate := range candidates {
++		if authIndex != "" && candidate.AuthIndex != authIndex {
++			continue
++		}
++		if accountID != "" && candidate.AccountID != accountID {
++			continue
++		}
++		return candidate, true
++	}
++	return account{}, false
++}
++
++func summarizeRun(run model.CodexInspectionRun, results []model.CodexInspectionResult) model.CodexInspectionRun {
++	run.DisabledCount = 0
++	run.EnabledCount = 0
++	run.DeleteCount = 0
++	run.DisableCount = 0
++	run.EnableCount = 0
++	run.ReauthCount = 0
++	run.KeepCount = 0
++	for _, result := range results {
++		if result.Disabled {
++			run.DisabledCount++
++		} else {
++			run.EnabledCount++
++		}
++		switch result.Action {
++		case "delete":
++			run.DeleteCount++
++		case "disable":
++			run.DisableCount++
++		case "enable":
++			run.EnableCount++
++		case "reauth":
++			run.ReauthCount++
++		default:
++			run.KeepCount++
++		}
++	}
++	return run
++}
++
++func applyActionOutcomes(results []model.CodexInspectionResult, outcomes []ActionOutcome) []model.CodexInspectionResult {
++	if len(outcomes) == 0 {
++		return results
++	}
++	byKey := map[string]ActionOutcome{}
++	for _, outcome := range outcomes {
++		byKey[outcome.AccountKey] = outcome
++	}
++	out := make([]model.CodexInspectionResult, len(results))
++	copy(out, results)
++	for i := range out {
++		outcome, ok := byKey[out[i].AccountKey]
++		if !ok {
++			continue
++		}
++		status := model.NormalizeCodexInspectionActionStatus(outcome.Status, out[i].Action)
++		if status == model.CodexInspectionActionStatusPending {
++			if outcome.Success {
++				status = model.CodexInspectionActionStatusSuccess
++			} else {
++				status = model.CodexInspectionActionStatusFailed
++			}
++		}
++		out[i].ActionStatus = status
++		out[i].ActionError = outcome.Error
++		out[i].ExecutedAction = ""
++		if status == model.CodexInspectionActionStatusSuccess {
++			out[i].ExecutedAction = outcome.Action
++			out[i].ActionError = ""
++			switch outcome.Action {
++			case "disable":
++				out[i].Disabled = true
++			case "enable":
++				out[i].Disabled = false
++			}
++		}
++	}
++	return out
++}
++
++func failedActionOutcome(item model.CodexInspectionResult, action string, message string) ActionOutcome {
++	return ActionOutcome{
++		ResultID:       item.ID,
++		AccountKey:     item.AccountKey,
++		FileName:       item.FileName,
++		DisplayAccount: item.DisplayAccount,
++		Action:         action,
++		Status:         model.CodexInspectionActionStatusFailed,
++		Success:        false,
++		Error:          message,
++	}
++}
++
++func needsReviewActionOutcome(item model.CodexInspectionResult, action string, message string) ActionOutcome {
++	return ActionOutcome{
++		ResultID:       item.ID,
++		AccountKey:     item.AccountKey,
++		FileName:       item.FileName,
++		DisplayAccount: item.DisplayAccount,
++		Action:         action,
++		Status:         model.CodexInspectionActionStatusNeedsReview,
++		Success:        true,
++		Error:          message,
++	}
++}
++
++func skippedActionOutcome(item model.CodexInspectionResult, action string, message string) ActionOutcome {
++	return ActionOutcome{
++		ResultID:       item.ID,
++		AccountKey:     item.AccountKey,
++		FileName:       item.FileName,
++		DisplayAccount: item.DisplayAccount,
++		Action:         action,
++		Status:         model.CodexInspectionActionStatusSkipped,
++		Success:        true,
++		Error:          message,
++	}
++}
++
++func countFailedOutcomes(outcomes []ActionOutcome) int {
++	count := 0
++	for _, outcome := range outcomes {
++		if !outcome.Success {
++			count++
++		}
++	}
++	return count
++}
++
++func failedActionOutcomes(outcomes []ActionOutcome) []map[string]any {
++	failed := make([]map[string]any, 0)
++	for _, outcome := range outcomes {
++		if outcome.Success {
++			continue
++		}
++		failed = append(failed, map[string]any{
++			"fileName":       outcome.FileName,
++			"displayAccount": outcome.DisplayAccount,
++			"action":         outcome.Action,
++			"error":          outcome.Error,
++		})
++	}
++	return failed
++}
++
++func resultFromAccount(item account) model.CodexInspectionResult {
++	return model.CodexInspectionResult{
++		AccountKey:     item.Key,
++		FileName:       item.FileName,
++		DisplayAccount: item.DisplayAccount,
++		AuthIndex:      item.AuthIndex,
++		AccountID:      item.AccountID,
++		Provider:       item.Provider,
++		Disabled:       item.Disabled,
++		Status:         item.Status,
++		State:          item.State,
++		Action:         "keep",
++		ActionReason:   "无需处理",
++		IsQuota:        false,
++	}
++}
++
++func pickSample(items []account, sampleSize int) []account {
++	if sampleSize <= 0 || sampleSize >= len(items) {
++		out := make([]account, len(items))
++		copy(out, items)
++		return out
++	}
++	out := make([]account, len(items))
++	copy(out, items)
++	rand.Shuffle(len(out), func(i, j int) {
++		out[i], out[j] = out[j], out[i]
++	})
++	return out[:sampleSize]
++}
++
++func countAccounts(items []account, disabled bool) int {
++	count := 0
++	for _, item := range items {
++		if item.Disabled == disabled {
++			count++
++		}
++	}
++	return count
++}
++
++func toAccount(file authFile) account {
++	fileName := firstNonEmpty(readString(file, "name"), readString(file, "id"), normalizeAuthIndex(file["auth_index"]), normalizeAuthIndex(file["authIndex"]), "unknown-auth-file")
++	authIndex := firstNonEmpty(normalizeAuthIndex(file["auth_index"]), normalizeAuthIndex(file["authIndex"]), normalizeAuthIndex(file["auth-index"]))
++	provider := strings.ToLower(firstNonEmpty(readString(file, "provider"), readString(file, "type")))
++	displayAccount := firstNonEmpty(
++		readString(file, "account"),
++		readString(file, "email"),
++		readString(file, "label"),
++		fileName,
++	)
++	key := fileName + "::" + authIndex
++	if authIndex == "" {
++		key = fileName + "::-"
++	}
++	return account{
++		Key:            key,
++		FileName:       fileName,
++		DisplayAccount: displayAccount,
++		AuthIndex:      authIndex,
++		AccountID:      resolveCodexAccountID(file),
++		Provider:       provider,
++		Disabled:       isDisabledAuthFile(file),
++		Status:         readString(file, "status"),
++		State:          readString(file, "state"),
++		File:           file,
++	}
++}
++
++func resolveCodexAccountID(file authFile) string {
++	metadata := readMap(file, "metadata")
++	attributes := readMap(file, "attributes")
++	candidates := []any{
++		file["chatgpt_account_id"],
++		file["chatgptAccountId"],
++		file["account_id"],
++		file["accountId"],
++		metadata["chatgpt_account_id"],
++		metadata["chatgptAccountId"],
++		metadata["account_id"],
++		metadata["accountId"],
++		attributes["chatgpt_account_id"],
++		attributes["chatgptAccountId"],
++		attributes["account_id"],
++		attributes["accountId"],
++	}
++	for _, candidate := range candidates {
++		if id := extractDirectCodexAccountID(candidate); id != "" {
++			return id
++		}
++	}
++	tokenCandidates := []any{
++		file["id_token"],
++		metadata["id_token"],
++		attributes["id_token"],
++	}
++	for _, candidate := range tokenCandidates {
++		if id := extractCodexAccountIDFromToken(candidate); id != "" {
++			return id
++		}
++	}
++	return ""
++}
++
++func extractDirectCodexAccountID(value any) string {
++	if direct := readPlainString(value); direct != "" {
++		return direct
++	}
++	if direct := readAccountIDCandidate(value); direct != "" {
++		return direct
++	}
++	return ""
++}
++
++func extractCodexAccountIDFromToken(value any) string {
++	payload := parseIDTokenPayload(value)
++	if payload == nil {
++		return ""
++	}
++	return readAccountIDCandidate(payload)
++}
++
++func readPlainString(value any) string {
++	text, ok := value.(string)
++	if !ok {
++		return ""
++	}
++	return strings.TrimSpace(text)
++}
++
++func readAccountIDCandidate(value any) string {
++	record, ok := value.(map[string]any)
++	if !ok {
++		return ""
++	}
++	return firstNonEmpty(
++		readString(record, "chatgpt_account_id"),
++		readString(record, "chatgptAccountId"),
++		readString(record, "account_id"),
++		readString(record, "accountId"),
++	)
++}
++
++func parseIDTokenPayload(value any) map[string]any {
++	switch typed := value.(type) {
++	case map[string]any:
++		return typed
++	case string:
++		trimmed := strings.TrimSpace(typed)
++		if trimmed == "" {
++			return nil
++		}
++		var parsed map[string]any
++		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
++			return parsed
++		}
++		segments := strings.Split(trimmed, ".")
++		if len(segments) < 2 {
++			return nil
++		}
++		decoded, err := base64.RawURLEncoding.DecodeString(segments[1])
++		if err != nil {
++			decoded, err = base64.URLEncoding.DecodeString(padBase64(segments[1]))
++			if err != nil {
++				return nil
++			}
++		}
++		if err := json.Unmarshal(decoded, &parsed); err == nil {
++			return parsed
++		}
++	}
++	return nil
++}
++
++func parseRateLimit(raw map[string]any) *codexRateLimit {
++	if raw == nil {
++		return nil
++	}
++	limit := &codexRateLimit{
++		PrimaryWindow:   parseWindow(readMap(raw, "primary_window", "primaryWindow")),
++		SecondaryWindow: parseWindow(readMap(raw, "secondary_window", "secondaryWindow")),
++	}
++	if value, ok := readBoolPtr(raw, "allowed"); ok {
++		limit.Allowed = value
++	}
++	limit.LimitReached = readBool(raw, "limit_reached", "limitReached")
++	return limit
++}
++
++func parseWindow(raw map[string]any) *codexWindow {
++	if raw == nil {
++		return nil
++	}
++	window := &codexWindow{}
++	if value, ok := readNumberPtr(raw, "used_percent", "usedPercent"); ok {
++		window.UsedPercent = value
++	}
++	if value, ok := readNumberPtr(raw, "limit_window_seconds", "limitWindowSeconds"); ok {
++		window.LimitWindowSeconds = value
++	}
++	return window
++}
++
++func classifyWindows(limit *codexRateLimit) codexClassifiedWindows {
++	if limit == nil {
++		return codexClassifiedWindows{}
++	}
++	raw := []*codexWindow{limit.PrimaryWindow, limit.SecondaryWindow}
++	var fiveHour *codexWindow
++	var weekly *codexWindow
++	var monthly *codexWindow
++	var genericLong *codexWindow
++	for _, window := range raw {
++		if window == nil || window.LimitWindowSeconds == nil {
++			continue
++		}
++		seconds := int(math.Round(*window.LimitWindowSeconds))
++		if seconds == codexFiveHourWindow && fiveHour == nil {
++			fiveHour = window
++		} else if seconds == codexWeekWindow && weekly == nil {
++			weekly = window
++		} else if seconds == codexMonthWindow && monthly == nil {
++			monthly = window
++		} else if seconds > codexFiveHourWindow && genericLong == nil {
++			genericLong = window
++		}
++	}
++	if fiveHour == nil && limit.PrimaryWindow != weekly && limit.PrimaryWindow != monthly && limit.PrimaryWindow != genericLong && !hasExplicitWindowSeconds(limit.PrimaryWindow) {
++		fiveHour = limit.PrimaryWindow
++	}
++	if weekly == nil && limit.SecondaryWindow != fiveHour && !hasExplicitWindowSeconds(limit.SecondaryWindow) {
++		weekly = limit.SecondaryWindow
++	}
++	return codexClassifiedWindows{FiveHour: fiveHour, Weekly: weekly, Monthly: monthly, GenericLong: genericLong}
++}
++
++func hasExplicitWindowSeconds(window *codexWindow) bool {
++	return window != nil && window.LimitWindowSeconds != nil
++}
++
++func deriveRateLimitUsedPercent(limit *codexRateLimit) *float64 {
++	if limit == nil {
++		return nil
++	}
++	var values []float64
++	for _, window := range []*codexWindow{limit.PrimaryWindow, limit.SecondaryWindow} {
++		if window != nil && window.UsedPercent != nil {
++			values = append(values, *window.UsedPercent)
++		}
++	}
++	if len(values) == 0 {
++		return nil
++	}
++	max := values[0]
++	for _, value := range values[1:] {
++		if value > max {
++			max = value
++		}
++	}
++	return &max
++}
++
++func isRateLimitReached(limit *codexRateLimit) bool {
++	if limit == nil {
++		return false
++	}
++	if limit.Allowed != nil && !*limit.Allowed {
++		return true
++	}
++	if limit.LimitReached {
++		return true
++	}
++	for _, window := range []*codexWindow{limit.PrimaryWindow, limit.SecondaryWindow} {
++		if window != nil && window.UsedPercent != nil && *window.UsedPercent >= 100 {
++			return true
++		}
++	}
++	return false
++}
++
++func normalizeBody(input any) (string, any) {
++	if input == nil {
++		return "", nil
++	}
++	if text, ok := input.(string); ok {
++		trimmed := strings.TrimSpace(text)
++		if trimmed == "" {
++			return text, nil
++		}
++		var parsed any
++		if err := json.Unmarshal([]byte(trimmed), &parsed); err == nil {
++			return text, parsed
++		}
++		return text, text
++	}
++	data, err := json.Marshal(input)
++	if err != nil {
++		return fmt.Sprint(input), input
++	}
++	return string(data), input
++}
++
++func parseRecord(input any) map[string]any {
++	switch typed := input.(type) {
++	case map[string]any:
++		return typed
++	case string:
++		var parsed map[string]any
++		if err := json.Unmarshal([]byte(strings.TrimSpace(typed)), &parsed); err == nil {
++			return parsed
++		}
++	}
++	return nil
++}
++
++func readMap(record map[string]any, keys ...string) map[string]any {
++	for _, key := range keys {
++		value, ok := record[key]
++		if !ok || value == nil {
++			continue
++		}
++		if typed, ok := value.(map[string]any); ok {
++			return typed
++		}
++	}
++	return nil
++}
++
++func firstValue(record map[string]any, keys ...string) (any, bool) {
++	for _, key := range keys {
++		value, ok := record[key]
++		if ok {
++			return value, true
++		}
++	}
++	return nil, false
++}
++
++func readString(record map[string]any, keys ...string) string {
++	for _, key := range keys {
++		value, ok := record[key]
++		if !ok || value == nil {
++			continue
++		}
++		text := strings.TrimSpace(fmt.Sprint(value))
++		if text != "" {
++			return text
++		}
++	}
++	return ""
++}
++
++func normalizeAuthIndex(value any) string {
++	if value == nil {
++		return ""
++	}
++	switch typed := value.(type) {
++	case float64:
++		if math.Trunc(typed) == typed {
++			return fmt.Sprintf("%.0f", typed)
++		}
++	case int:
++		return fmt.Sprint(typed)
++	case int64:
++		return fmt.Sprint(typed)
++	}
++	return strings.TrimSpace(fmt.Sprint(value))
++}
++
++func isDisabledAuthFile(file authFile) bool {
++	status := strings.ToLower(firstNonEmpty(readString(file, "status"), readString(file, "state")))
++	if status == "disabled" || status == "inactive" {
++		return true
++	}
++	value, ok := file["disabled"]
++	if !ok || value == nil {
++		return false
++	}
++	switch typed := value.(type) {
++	case bool:
++		return typed
++	case float64:
++		return typed != 0
++	case string:
++		normalized := strings.ToLower(strings.TrimSpace(typed))
++		return normalized == "true" || normalized == "1"
++	default:
++		return false
++	}
++}
++
++func readBool(record map[string]any, keys ...string) bool {
++	for _, key := range keys {
++		value, ok := record[key]
++		if !ok {
++			continue
++		}
++		switch typed := value.(type) {
++		case bool:
++			return typed
++		case string:
++			normalized := strings.ToLower(strings.TrimSpace(typed))
++			return normalized == "true" || normalized == "1" || normalized == "yes" || normalized == "on"
++		case float64:
++			return typed != 0
++		}
++	}
++	return false
++}
++
++func readBoolPtr(record map[string]any, keys ...string) (*bool, bool) {
++	for _, key := range keys {
++		value, ok := record[key]
++		if !ok || value == nil {
++			continue
++		}
++		switch typed := value.(type) {
++		case bool:
++			return &typed, true
++		case string:
++			normalized := strings.ToLower(strings.TrimSpace(typed))
++			if normalized == "true" || normalized == "1" || normalized == "yes" || normalized == "on" {
++				result := true
++				return &result, true
++			}
++			if normalized == "false" || normalized == "0" || normalized == "no" || normalized == "off" {
++				result := false
++				return &result, true
++			}
++		case float64:
++			result := typed != 0
++			return &result, true
++		}
++	}
++	return nil, false
++}
++
++func readNumberPtr(record map[string]any, keys ...string) (*float64, bool) {
++	for _, key := range keys {
++		value, ok := record[key]
++		if !ok || value == nil {
++			continue
++		}
++		switch typed := value.(type) {
++		case float64:
++			return &typed, true
++		case int:
++			value := float64(typed)
++			return &value, true
++		case string:
++			parsed, err := strconvParseFloat(typed)
++			if err == nil {
++				return &parsed, true
++			}
++		}
++	}
++	return nil, false
++}
++
++func readFloat(value any, fallback float64) float64 {
++	switch typed := value.(type) {
++	case float64:
++		return typed
++	case int:
++		return float64(typed)
++	case string:
++		if parsed, err := strconvParseFloat(typed); err == nil {
++			return parsed
++		}
++	}
++	return fallback
++}
++
++func strconvParseFloat(value string) (float64, error) {
++	return strconvParseFloat64(strings.TrimSpace(strings.TrimSuffix(value, "%")))
++}
++
++func strconvParseFloat64(value string) (float64, error) {
++	var parsed float64
++	_, err := fmt.Sscan(value, &parsed)
++	return parsed, err
++}
++
++func firstNonEmpty(values ...string) string {
++	for _, value := range values {
++		trimmed := strings.TrimSpace(value)
++		if trimmed != "" {
++			return trimmed
++		}
++	}
++	return ""
++}
++
++func ptrFloat(value float64) *float64 {
++	return &value
++}
++
++func nullableFloat(value *float64) any {
++	if value == nil {
++		return nil
++	}
++	return *value
++}
++
++func truncate(value string, limit int) string {
++	if limit <= 0 || len(value) <= limit {
++		return value
++	}
++	return value[:limit] + "...(truncated)"
++}
++
++func sanitizeDetail(detail any) any {
++	if detail == nil {
++		return nil
++	}
++	data, err := json.Marshal(detail)
++	if err != nil {
++		return detail
++	}
++	var parsed any
++	if err := json.Unmarshal(data, &parsed); err != nil {
++		return detail
++	}
++	return redactValue(parsed)
++}
++
++func redactValue(value any) any {
++	switch typed := value.(type) {
++	case map[string]any:
++		result := make(map[string]any, len(typed))
++		for key, item := range typed {
++			if isSecretKey(key) {
++				result[key] = "[redacted]"
++				continue
++			}
++			result[key] = redactValue(item)
++		}
++		return result
++	case []any:
++		result := make([]any, len(typed))
++		for i, item := range typed {
++			result[i] = redactValue(item)
++		}
++		return result
++	default:
++		return typed
++	}
++}
++
++func isSecretKey(key string) bool {
++	normalized := strings.ToLower(key)
++	return strings.Contains(normalized, "token") ||
++		strings.Contains(normalized, "secret") ||
++		strings.Contains(normalized, "authorization") ||
++		strings.Contains(normalized, "key")
++}
++
++func padBase64(value string) string {
++	switch len(value) % 4 {
++	case 2:
++		return value + "=="
++	case 3:
++		return value + "="
++	default:
++		return value
++	}
++}
 diff --git a/internal/plusmanager/collector/collector.go b/internal/plusmanager/collector/collector.go
 new file mode 100644
 index 00000000..4551d0ff
@@ -3025,12 +5086,213 @@ index 00000000..b505bc88
 +type RedisQueue struct{}
 +
 +func (RedisQueue) PopOldest(count int) [][]byte { return redisqueue.PopOldest(count) }
+diff --git a/internal/plusmanager/cpa/client.go b/internal/plusmanager/cpa/client.go
+new file mode 100644
+index 00000000..de4171e8
+--- /dev/null
++++ b/internal/plusmanager/cpa/client.go
+@@ -0,0 +1,195 @@
++package cpa
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"fmt"
++	"net/http"
++	"strconv"
++	"strings"
++	"time"
++)
++
++type UsageConfig struct {
++	UsageStatisticsEnabled          bool `json:"usageStatisticsEnabled"`
++	RedisUsageQueueRetentionSeconds int  `json:"redisUsageQueueRetentionSeconds"`
++	RetentionSourceDefault          bool `json:"retentionSourceDefault"`
++}
++
++type ManagementConfig struct {
++	UsageConfig
++	ProxyURL string `json:"proxyUrl,omitempty"`
++}
++
++func ValidateManagementAPI(ctx context.Context, baseURL string, key string) error {
++	req, err := http.NewRequestWithContext(ctx, http.MethodGet, NormalizeBaseURL(baseURL)+"/v0/management/config", nil)
++	if err != nil {
++		return err
++	}
++	req.Header.Set("Authorization", "Bearer "+key)
++	client := &http.Client{Timeout: 15 * time.Second}
++	res, err := client.Do(req)
++	if err != nil {
++		return err
++	}
++	defer res.Body.Close()
++	if res.StatusCode >= 200 && res.StatusCode < 300 {
++		return nil
++	}
++	return errors.New("management API validation failed: " + res.Status)
++}
++
++func FetchUsageConfig(ctx context.Context, baseURL string, key string) (UsageConfig, error) {
++	cfg, err := FetchManagementConfig(ctx, baseURL, key)
++	if err != nil {
++		return UsageConfig{}, err
++	}
++	return cfg.UsageConfig, nil
++}
++
++func FetchManagementConfig(ctx context.Context, baseURL string, key string) (ManagementConfig, error) {
++	req, err := http.NewRequestWithContext(ctx, http.MethodGet, NormalizeBaseURL(baseURL)+"/v0/management/config", nil)
++	if err != nil {
++		return ManagementConfig{}, err
++	}
++	req.Header.Set("Authorization", "Bearer "+key)
++	client := &http.Client{Timeout: 15 * time.Second}
++	res, err := client.Do(req)
++	if err != nil {
++		return ManagementConfig{}, err
++	}
++	defer res.Body.Close()
++	if res.StatusCode < 200 || res.StatusCode >= 300 {
++		return ManagementConfig{}, errors.New("management API config request failed: " + res.Status)
++	}
++
++	var raw map[string]any
++	if err := json.NewDecoder(res.Body).Decode(&raw); err != nil {
++		return ManagementConfig{}, err
++	}
++	usageEnabled := readBoolField(raw, "usage-statistics-enabled", "usageStatisticsEnabled")
++	retention, hasRetention := readIntField(raw, "redis-usage-queue-retention-seconds", "redisUsageQueueRetentionSeconds")
++	if !hasRetention {
++		retention = 60
++	}
++	return ManagementConfig{
++		UsageConfig: UsageConfig{
++			UsageStatisticsEnabled:          usageEnabled,
++			RedisUsageQueueRetentionSeconds: retention,
++			RetentionSourceDefault:          !hasRetention,
++		},
++		ProxyURL: readStringField(raw, "proxy-url", "proxyUrl", "proxy_url"),
++	}, nil
++}
++
++func SetUsageStatisticsEnabled(ctx context.Context, baseURL string, key string, enabled bool) error {
++	payload := map[string]bool{"value": enabled}
++	data, err := json.Marshal(payload)
++	if err != nil {
++		return err
++	}
++	req, err := http.NewRequestWithContext(
++		ctx,
++		http.MethodPut,
++		NormalizeBaseURL(baseURL)+"/v0/management/usage-statistics-enabled",
++		strings.NewReader(string(data)),
++	)
++	if err != nil {
++		return err
++	}
++	req.Header.Set("Authorization", "Bearer "+key)
++	req.Header.Set("Content-Type", "application/json")
++	client := &http.Client{Timeout: 15 * time.Second}
++	res, err := client.Do(req)
++	if err != nil {
++		return err
++	}
++	defer res.Body.Close()
++	if res.StatusCode >= 200 && res.StatusCode < 300 {
++		return nil
++	}
++	return errors.New("enable CPA usage statistics failed: " + res.Status)
++}
++
++func ValidateCollectorConfig(ctx context.Context, baseURL string, key string, pollIntervalMS int) error {
++	usageCfg, err := FetchUsageConfig(ctx, baseURL, key)
++	if err != nil {
++		return err
++	}
++	retentionMS := usageCfg.RedisUsageQueueRetentionSeconds * 1000
++	if retentionMS <= 0 {
++		return errors.New("CPA redis-usage-queue-retention-seconds must be greater than 0")
++	}
++	if pollIntervalMS > retentionMS {
++		return fmt.Errorf(
++			"pollIntervalMs must be less than or equal to CPA redis-usage-queue-retention-seconds (%d seconds)",
++			usageCfg.RedisUsageQueueRetentionSeconds,
++		)
++	}
++	return nil
++}
++
++func NormalizeBaseURL(raw string) string {
++	value := strings.TrimSpace(raw)
++	if value == "" {
++		return ""
++	}
++	if !strings.Contains(value, "://") {
++		value = "http://" + value
++	}
++	value = strings.TrimRight(value, "/")
++	value = strings.TrimSuffix(value, "/v0/management")
++	value = strings.TrimSuffix(value, "/v0")
++	return value
++}
++
++func readBoolField(raw map[string]any, keys ...string) bool {
++	for _, key := range keys {
++		value, ok := raw[key]
++		if !ok {
++			continue
++		}
++		switch typed := value.(type) {
++		case bool:
++			return typed
++		case string:
++			normalized := strings.ToLower(strings.TrimSpace(typed))
++			return normalized == "1" || normalized == "true" || normalized == "yes" || normalized == "on"
++		}
++	}
++	return false
++}
++
++func readIntField(raw map[string]any, keys ...string) (int, bool) {
++	for _, key := range keys {
++		value, ok := raw[key]
++		if !ok || value == nil {
++			continue
++		}
++		switch typed := value.(type) {
++		case float64:
++			return int(typed), true
++		case int:
++			return typed, true
++		case json.Number:
++			parsed, err := strconv.Atoi(typed.String())
++			return parsed, err == nil
++		case string:
++			parsed, err := strconv.Atoi(strings.TrimSpace(typed))
++			return parsed, err == nil
++		}
++	}
++	return 0, false
++}
++
++func readStringField(raw map[string]any, keys ...string) string {
++	for _, key := range keys {
++		value, ok := raw[key]
++		if !ok || value == nil {
++			continue
++		}
++		return strings.TrimSpace(fmt.Sprint(value))
++	}
++	return ""
++}
 diff --git a/internal/plusmanager/httpapi/router.go b/internal/plusmanager/httpapi/router.go
 new file mode 100644
-index 00000000..b78d8611
+index 00000000..25762c7c
 --- /dev/null
 +++ b/internal/plusmanager/httpapi/router.go
-@@ -0,0 +1,1121 @@
+@@ -0,0 +1,1248 @@
 +package httpapi
 +
 +import (
@@ -3048,7 +5310,9 @@ index 00000000..b78d8611
 +
 +	"github.com/gin-gonic/gin"
 +
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/codexinspection"
 +	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/collector"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/managerconfig"
 +	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
 +)
 +
@@ -3077,9 +5341,12 @@ index 00000000..b78d8611
 +}
 +
 +type Options struct {
-+	Enabled   bool
-+	Store     any
-+	Collector CollectorStatusProvider
++	Enabled         bool
++	Store           any
++	Collector       CollectorStatusProvider
++	ManagerConfig   *managerconfig.Service
++	CodexInspection *codexinspection.Service
++	Auth            []gin.HandlerFunc
 +}
 +
 +func RegisterRoutes(group *gin.RouterGroup, opts Options) {
@@ -3147,15 +5414,46 @@ index 00000000..b78d8611
 +			"mode":    "integrated",
 +		})
 +	})
-+	engine.GET("/usage-service/config", func(c *gin.Context) {
-+		c.JSON(http.StatusOK, integratedManagerConfigResponse())
++	configHandlers := append([]gin.HandlerFunc{}, opts.Auth...)
++	configHandlers = append(configHandlers, func(c *gin.Context) {
++		if opts.ManagerConfig == nil {
++			c.JSON(http.StatusOK, integratedManagerConfigResponse(c.Request.Context(), nil))
++			return
++		}
++		if c.Request.Method == http.MethodPut {
++			var req struct {
++				Config store.ManagerConfig `json:"config"`
++			}
++			if err := c.ShouldBindJSON(&req); err != nil {
++				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
++				return
++			}
++			res, err := opts.ManagerConfig.Update(c.Request.Context(), req.Config)
++			if err != nil {
++				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
++				return
++			}
++			c.JSON(http.StatusOK, res)
++			return
++		}
++		res, err := opts.ManagerConfig.Get(c.Request.Context())
++		if err != nil {
++			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
++			return
++		}
++		c.JSON(http.StatusOK, res)
 +	})
-+	engine.PUT("/usage-service/config", func(c *gin.Context) {
-+		c.JSON(http.StatusOK, integratedManagerConfigResponse())
-+	})
++	engine.GET("/usage-service/config", configHandlers...)
++	engine.PUT("/usage-service/config", configHandlers...)
 +}
 +
-+func integratedManagerConfigResponse() gin.H {
++func integratedManagerConfigResponse(ctx context.Context, svc *managerconfig.Service) gin.H {
++	if svc != nil {
++		res, err := svc.Get(ctx)
++		if err == nil {
++			return gin.H{"source": res.Source, "config": res.Config, "cpaUsage": res.CPAUsage}
++		}
++	}
 +	return gin.H{
 +		"source": "integrated",
 +		"config": gin.H{
@@ -3170,8 +5468,9 @@ index 00000000..b78d8611
 +				"popSide":        "left",
 +				"batchSize":      100,
 +				"pollIntervalMs": 1000,
-+				"queryLimit":     100,
++				"queryLimit":     50000,
 +			},
++			"codexInspection": store.DefaultCodexInspectionConfig(),
 +			"externalUsageService": gin.H{
 +				"enabled":     false,
 +				"serviceBase": "",
@@ -3182,6 +5481,96 @@ index 00000000..b78d8611
 +			"redisUsageQueueRetentionSeconds": 60,
 +			"retentionSourceDefault":          true,
 +		},
++	}
++}
++
++func RegisterCodexInspectionRoutes(group *gin.RouterGroup, opts Options) {
++	if group == nil || !opts.Enabled {
++		return
++	}
++	group.GET("/codex-inspection/runs", func(c *gin.Context) {
++		if opts.CodexInspection == nil {
++			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "codex inspection service unavailable"})
++			return
++		}
++		limit := 20
++		if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
++			if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
++				limit = parsed
++			}
++		}
++		runs, err := opts.CodexInspection.ListRuns(c.Request.Context(), limit)
++		if err != nil {
++			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
++			return
++		}
++		c.JSON(http.StatusOK, gin.H{"items": runs})
++	})
++	group.POST("/codex-inspection/run", func(c *gin.Context) {
++		if opts.CodexInspection == nil {
++			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "codex inspection service unavailable"})
++			return
++		}
++		result, err := opts.CodexInspection.Run(context.WithoutCancel(c.Request.Context()), codexinspection.RunRequest{TriggerType: "manual", TriggerKey: "manual"})
++		if err != nil {
++			c.JSON(codexInspectionErrorStatus(err), gin.H{"error": err.Error()})
++			return
++		}
++		c.JSON(http.StatusOK, result)
++	})
++	group.GET("/codex-inspection/runs/:id", func(c *gin.Context) {
++		if opts.CodexInspection == nil {
++			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "codex inspection service unavailable"})
++			return
++		}
++		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
++		if err != nil || id <= 0 {
++			c.JSON(http.StatusBadRequest, gin.H{"error": "run id is required"})
++			return
++		}
++		detail, err := opts.CodexInspection.GetRun(c.Request.Context(), id)
++		if err != nil {
++			c.JSON(codexInspectionErrorStatus(err), gin.H{"error": err.Error()})
++			return
++		}
++		c.JSON(http.StatusOK, detail)
++	})
++	group.POST("/codex-inspection/runs/:id/actions", func(c *gin.Context) {
++		if opts.CodexInspection == nil {
++			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "codex inspection service unavailable"})
++			return
++		}
++		id, err := strconv.ParseInt(c.Param("id"), 10, 64)
++		if err != nil || id <= 0 {
++			c.JSON(http.StatusBadRequest, gin.H{"error": "run id is required"})
++			return
++		}
++		var req codexinspection.ExecuteActionsRequest
++		if err := c.ShouldBindJSON(&req); err != nil {
++			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
++			return
++		}
++		result, err := opts.CodexInspection.ExecuteManualActions(c.Request.Context(), id, req)
++		if err != nil {
++			c.JSON(codexInspectionErrorStatus(err), gin.H{"error": err.Error()})
++			return
++		}
++		c.JSON(http.StatusOK, result)
++	})
++}
++
++func codexInspectionErrorStatus(err error) int {
++	switch {
++	case errors.Is(err, codexinspection.ErrRunNotFound):
++		return http.StatusNotFound
++	case errors.Is(err, codexinspection.ErrRunAlreadyActive), errors.Is(err, codexinspection.ErrRunNotCompleted):
++		return http.StatusConflict
++	case errors.Is(err, codexinspection.ErrNotConfigured):
++		return http.StatusPreconditionFailed
++	case errors.Is(err, codexinspection.ErrActionIDsRequired), errors.Is(err, codexinspection.ErrNoActionableResults):
++		return http.StatusBadRequest
++	default:
++		return http.StatusInternalServerError
 +	}
 +}
 +
@@ -4154,10 +6543,10 @@ index 00000000..b78d8611
 +}
 diff --git a/internal/plusmanager/httpapi/router_test.go b/internal/plusmanager/httpapi/router_test.go
 new file mode 100644
-index 00000000..077a2a7f
+index 00000000..6be4ae6e
 --- /dev/null
 +++ b/internal/plusmanager/httpapi/router_test.go
-@@ -0,0 +1,535 @@
+@@ -0,0 +1,619 @@
 +package httpapi
 +
 +import (
@@ -4172,7 +6561,9 @@ index 00000000..077a2a7f
 +
 +	"github.com/gin-gonic/gin"
 +
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/codexinspection"
 +	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/collector"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/managerconfig"
 +	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
 +)
 +
@@ -4693,6 +7084,244 @@ index 00000000..077a2a7f
 +		t.Fatalf("analytics response = %#v", analyticsResp)
 +	}
 +}
++
++func TestCodexInspectionRoutesRunAndPersistHistory(t *testing.T) {
++	gin.SetMode(gin.TestMode)
++	var sawManagementAuth bool
++	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		if r.Header.Get("Authorization") == "Bearer internal-management-key" {
++			sawManagementAuth = true
++		}
++		switch {
++		case r.URL.Path == "/auth-files" && r.Method == http.MethodGet:
++			_, _ = w.Write([]byte(`{"files":[{"name":"auth-a.json","auth_index":"auth-1","provider":"codex","account":"alice@example.com","status":"ok","state":"ready"}]}`))
++		case r.URL.Path == "/api-call" && r.Method == http.MethodPost:
++			_, _ = w.Write([]byte(`{"status_code":200,"body":{"ok":true}}`))
++		default:
++			http.NotFound(w, r)
++		}
++	}))
++	defer upstream.Close()
++
++	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
++	if err != nil {
++		t.Fatalf("store.Open() error = %v", err)
++	}
++	defer s.Close()
++	managerSvc := managerconfig.New(nil, s, upstream.URL, "internal-management-key")
++	inspectionSvc := codexinspection.New(s, managerSvc)
++
++	r := gin.New()
++	RegisterCodexInspectionRoutes(r.Group("/v0/management"), Options{Enabled: true, CodexInspection: inspectionSvc})
++
++	runReq := httptest.NewRequest(http.MethodPost, "/v0/management/codex-inspection/run", nil)
++	runW := httptest.NewRecorder()
++	r.ServeHTTP(runW, runReq)
++	if runW.Code != http.StatusOK {
++		t.Fatalf("run status code = %d, want 200; body=%s", runW.Code, runW.Body.String())
++	}
++	if !sawManagementAuth {
++		t.Fatal("inspection did not call upstream with internal management key")
++	}
++
++	listReq := httptest.NewRequest(http.MethodGet, "/v0/management/codex-inspection/runs?limit=30", nil)
++	listW := httptest.NewRecorder()
++	r.ServeHTTP(listW, listReq)
++	if listW.Code != http.StatusOK || !strings.Contains(listW.Body.String(), `"items"`) {
++		t.Fatalf("list status=%d body=%s", listW.Code, listW.Body.String())
++	}
++}
++
++func TestUsageServiceConfigPersistsCodexInspectionSchedule(t *testing.T) {
++	gin.SetMode(gin.TestMode)
++	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
++	if err != nil {
++		t.Fatalf("store.Open() error = %v", err)
++	}
++	defer s.Close()
++	managerSvc := managerconfig.New(nil, s, "http://127.0.0.1:8317", "internal-management-key")
++
++	r := gin.New()
++	RegisterCompatibilityRoutes(r, Options{Enabled: true, ManagerConfig: managerSvc})
++
++	body := strings.NewReader(`{"config":{"codexInspection":{"enabled":true,"schedule":{"mode":"interval","intervalMinutes":15},"targetType":"codex","workers":2,"deleteWorkers":1,"timeout":5000,"retries":0,"userAgent":"test-agent","usedPercentThreshold":80,"sampleSize":0,"autoActionMode":"disable"}}}`)
++	req := httptest.NewRequest(http.MethodPut, "/usage-service/config", body)
++	req.Header.Set("Content-Type", "application/json")
++	w := httptest.NewRecorder()
++	r.ServeHTTP(w, req)
++	if w.Code != http.StatusOK {
++		t.Fatalf("PUT status code = %d, want 200; body=%s", w.Code, w.Body.String())
++	}
++
++	getReq := httptest.NewRequest(http.MethodGet, "/usage-service/config", nil)
++	getW := httptest.NewRecorder()
++	r.ServeHTTP(getW, getReq)
++	if getW.Code != http.StatusOK {
++		t.Fatalf("GET status code = %d, want 200; body=%s", getW.Code, getW.Body.String())
++	}
++	if !strings.Contains(getW.Body.String(), `"intervalMinutes":15`) || !strings.Contains(getW.Body.String(), `"autoActionMode":"disable"`) {
++		t.Fatalf("saved codex inspection config not returned: %s", getW.Body.String())
++	}
++	if strings.Contains(getW.Body.String(), "internal-management-key") {
++		t.Fatalf("response leaked internal management key: %s", getW.Body.String())
++	}
++}
+diff --git a/internal/plusmanager/managerconfig/service.go b/internal/plusmanager/managerconfig/service.go
+new file mode 100644
+index 00000000..8d7f0647
+--- /dev/null
++++ b/internal/plusmanager/managerconfig/service.go
+@@ -0,0 +1,150 @@
++package managerconfig
++
++import (
++	"context"
++	"errors"
++	"strings"
++	"time"
++
++	proxyconfig "github.com/router-for-me/CLIProxyAPI/v7/internal/config"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/cpa"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/model"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
++)
++
++type Source string
++
++const (
++	SourceNone       Source = ""
++	SourceIntegrated Source = "integrated"
++	SourceDB         Source = "db"
++)
++
++type Response struct {
++	Config   store.ManagerConfig `json:"config"`
++	Source   string              `json:"source"`
++	CPAUsage *cpa.UsageConfig    `json:"cpaUsage,omitempty"`
++}
++
++type Service struct {
++	cfg                   *proxyconfig.Config
++	store                 *store.Store
++	internalBaseURL       string
++	internalManagementKey string
++}
++
++func New(cfg *proxyconfig.Config, st *store.Store, internalBaseURL, internalManagementKey string) *Service {
++	return &Service{cfg: cfg, store: st, internalBaseURL: internalBaseURL, internalManagementKey: internalManagementKey}
++}
++
++func (s *Service) Get(ctx context.Context) (Response, error) {
++	cfg, source, _, err := s.ResolveManagerConfigWithSource(ctx)
++	if err != nil {
++		return Response{}, err
++	}
++	return Response{
++		Config: cfg,
++		Source: string(source),
++		CPAUsage: &cpa.UsageConfig{
++			UsageStatisticsEnabled:          true,
++			RedisUsageQueueRetentionSeconds: 60,
++			RetentionSourceDefault:          true,
++		},
++	}, nil
++}
++
++func (s *Service) Update(ctx context.Context, submitted store.ManagerConfig) (Response, error) {
++	current, _, _, err := s.ResolveManagerConfigWithSource(ctx)
++	if err != nil {
++		return Response{}, err
++	}
++	if err := model.ValidateCodexInspectionConfig(submitted.CodexInspection); err != nil {
++		return Response{}, err
++	}
++	next := s.MergeSubmittedManagerConfig(current, submitted)
++	next.CPAConnection.CPABaseURL = "integrated"
++	next.CPAConnection.ManagementKey = "integrated"
++	if s.store != nil {
++		if err := s.store.SaveManagerConfig(ctx, next); err != nil {
++			return Response{}, err
++		}
++	}
++	return Response{Config: next, Source: string(SourceDB)}, nil
++}
++
++func (s *Service) ResolveManagerConfigWithSource(ctx context.Context) (store.ManagerConfig, Source, bool, error) {
++	cfg := s.DefaultManagerConfig()
++	source := SourceIntegrated
++	found := true
++	if s.store != nil {
++		if saved, ok, err := s.store.LoadManagerConfig(ctx); err != nil {
++			return cfg, source, false, err
++		} else if ok {
++			cfg = s.MergeSubmittedManagerConfig(cfg, saved)
++			source = SourceDB
++			found = true
++		}
++	}
++	cfg.CPAConnection.CPABaseURL = "integrated"
++	cfg.CPAConnection.ManagementKey = "integrated"
++	return cfg, source, found, nil
++}
++
++func (s *Service) ResolveRuntime(ctx context.Context) (store.ManagerConfig, store.Setup, bool, error) {
++	cfg, _, found, err := s.ResolveManagerConfigWithSource(ctx)
++	if err != nil || !found {
++		return cfg, store.Setup{}, found, err
++	}
++	base := cpa.NormalizeBaseURL(s.internalBaseURL)
++	key := strings.TrimSpace(s.internalManagementKey)
++	if base == "" || key == "" {
++		return cfg, store.Setup{}, false, errors.New("integrated management endpoint is not ready")
++	}
++	return cfg, store.Setup{CPAUpstreamURL: base, ManagementKey: key, Queue: "redisqueue", PopSide: "left"}, true, nil
++}
++
++func (s *Service) DefaultManagerConfig() store.ManagerConfig {
++	pollIntervalMS := 1000
++	if s != nil && s.cfg != nil && s.cfg.PlusManager.PollIntervalMs > 0 {
++		pollIntervalMS = s.cfg.PlusManager.PollIntervalMs
++	}
++	return store.ManagerConfig{
++		CPAConnection: store.ManagerCPAConnectionConfig{CPABaseURL: "integrated", ManagementKey: "integrated"},
++		Collector: store.ManagerCollectorConfig{
++			Enabled:        BoolPtr(true),
++			CollectorMode:  "auto",
++			Queue:          "redisqueue",
++			PopSide:        "left",
++			BatchSize:      100,
++			PollIntervalMS: pollIntervalMS,
++			QueryLimit:     50000,
++		},
++		CodexInspection:      store.DefaultCodexInspectionConfig(),
++		ExternalUsageService: store.ManagerExternalUsageServiceConfig{Enabled: false, ServiceBase: ""},
++	}
++}
++
++func (s *Service) MergeSubmittedManagerConfig(base store.ManagerConfig, submitted store.ManagerConfig) store.ManagerConfig {
++	next := base
++	if submitted.Collector.Enabled != nil {
++		next.Collector.Enabled = BoolPtr(*submitted.Collector.Enabled)
++	}
++	if submitted.Collector.CollectorMode != "" {
++		next.Collector.CollectorMode = strings.TrimSpace(submitted.Collector.CollectorMode)
++	}
++	if submitted.Collector.BatchSize > 0 {
++		next.Collector.BatchSize = submitted.Collector.BatchSize
++	}
++	if submitted.Collector.PollIntervalMS > 0 {
++		next.Collector.PollIntervalMS = submitted.Collector.PollIntervalMS
++	}
++	if submitted.Collector.QueryLimit > 0 {
++		next.Collector.QueryLimit = submitted.Collector.QueryLimit
++	}
++	next.CodexInspection = model.NormalizeCodexInspectionConfig(submitted.CodexInspection, base.CodexInspection)
++	next.ExternalUsageService = store.ManagerExternalUsageServiceConfig{Enabled: false, ServiceBase: ""}
++	next.UpdatedAtMS = time.Now().UnixMilli()
++	return next
++}
++
++func BoolPtr(value bool) *bool { return &value }
 diff --git a/internal/plusmanager/model/api_key_alias.go b/internal/plusmanager/model/api_key_alias.go
 new file mode 100644
 index 00000000..277e719d
@@ -4706,6 +7335,475 @@ index 00000000..277e719d
 +	APIKeyHash  string `json:"apiKeyHash"`
 +	Alias       string `json:"alias"`
 +	UpdatedAtMS int64  `json:"updatedAtMs,omitempty"`
++}
+diff --git a/internal/plusmanager/model/codex_inspection.go b/internal/plusmanager/model/codex_inspection.go
+new file mode 100644
+index 00000000..5b5b21cb
+--- /dev/null
++++ b/internal/plusmanager/model/codex_inspection.go
+@@ -0,0 +1,427 @@
++package model
++
++import (
++	"encoding/json"
++	"fmt"
++	"sort"
++	"strconv"
++	"strings"
++	"time"
++)
++
++const (
++	CodexInspectionScheduleModeInterval   = "interval"
++	CodexInspectionScheduleModeTimePoints = "time_points"
++
++	CodexInspectionAutoActionNone    = "none"
++	CodexInspectionAutoActionEnable  = "enable"
++	CodexInspectionAutoActionDisable = "disable"
++	CodexInspectionAutoActionDelete  = "delete"
++
++	CodexInspectionStatusRunning   = "running"
++	CodexInspectionStatusCompleted = "completed"
++	CodexInspectionStatusFailed    = "failed"
++
++	CodexInspectionTriggerManual    = "manual"
++	CodexInspectionTriggerScheduled = "scheduled"
++
++	CodexInspectionActionStatusNone        = "none"
++	CodexInspectionActionStatusPending     = "pending"
++	CodexInspectionActionStatusSuccess     = "success"
++	CodexInspectionActionStatusFailed      = "failed"
++	CodexInspectionActionStatusSkipped     = "skipped"
++	CodexInspectionActionStatusNeedsReview = "needs_review"
++)
++
++type ManagerCodexInspectionConfig struct {
++	Enabled              *bool                                `json:"enabled,omitempty"`
++	Schedule             ManagerCodexInspectionScheduleConfig `json:"schedule"`
++	TargetType           string                               `json:"targetType,omitempty"`
++	Workers              int                                  `json:"workers,omitempty"`
++	DeleteWorkers        int                                  `json:"deleteWorkers,omitempty"`
++	Timeout              int                                  `json:"timeout,omitempty"`
++	Retries              int                                  `json:"retries,omitempty"`
++	UserAgent            string                               `json:"userAgent,omitempty"`
++	UsedPercentThreshold float64                              `json:"usedPercentThreshold,omitempty"`
++	SampleSize           int                                  `json:"sampleSize,omitempty"`
++	AutoActionMode       string                               `json:"autoActionMode,omitempty"`
++}
++
++type ManagerCodexInspectionScheduleConfig struct {
++	Mode            string   `json:"mode,omitempty"`
++	TimePoints      []string `json:"timePoints,omitempty"`
++	IntervalMinutes int      `json:"intervalMinutes,omitempty"`
++	TimeZone        string   `json:"timeZone,omitempty"`
++}
++
++type CodexInspectionRun struct {
++	ID            int64                        `json:"id"`
++	TriggerType   string                       `json:"triggerType"`
++	TriggerKey    string                       `json:"triggerKey,omitempty"`
++	Status        string                       `json:"status"`
++	StartedAtMS   int64                        `json:"startedAtMs"`
++	FinishedAtMS  int64                        `json:"finishedAtMs,omitempty"`
++	TotalFiles    int                          `json:"totalFiles"`
++	ProbeSetCount int                          `json:"probeSetCount"`
++	SampledCount  int                          `json:"sampledCount"`
++	DisabledCount int                          `json:"disabledCount"`
++	EnabledCount  int                          `json:"enabledCount"`
++	DeleteCount   int                          `json:"deleteCount"`
++	DisableCount  int                          `json:"disableCount"`
++	EnableCount   int                          `json:"enableCount"`
++	ReauthCount   int                          `json:"reauthCount"`
++	KeepCount     int                          `json:"keepCount"`
++	Error         string                       `json:"error,omitempty"`
++	Settings      ManagerCodexInspectionConfig `json:"settings"`
++	SettingsJSON  string                       `json:"-"`
++	CreatedAtMS   int64                        `json:"createdAtMs"`
++	UpdatedAtMS   int64                        `json:"updatedAtMs"`
++}
++
++type CodexInspectionResult struct {
++	ID             int64    `json:"id"`
++	RunID          int64    `json:"runId"`
++	AccountKey     string   `json:"accountKey"`
++	FileName       string   `json:"fileName"`
++	DisplayAccount string   `json:"displayAccount"`
++	AuthIndex      string   `json:"authIndex,omitempty"`
++	AccountID      string   `json:"accountId,omitempty"`
++	Provider       string   `json:"provider"`
++	Disabled       bool     `json:"disabled"`
++	Status         string   `json:"status,omitempty"`
++	State          string   `json:"state,omitempty"`
++	Action         string   `json:"action"`
++	ActionReason   string   `json:"actionReason"`
++	ActionStatus   string   `json:"actionStatus,omitempty"`
++	ExecutedAction string   `json:"executedAction,omitempty"`
++	ActionError    string   `json:"actionError,omitempty"`
++	StatusCode     *int     `json:"statusCode,omitempty"`
++	UsedPercent    *float64 `json:"usedPercent,omitempty"`
++	IsQuota        bool     `json:"isQuota"`
++	Error          string   `json:"error,omitempty"`
++	CreatedAtMS    int64    `json:"createdAtMs"`
++}
++
++type CodexInspectionLog struct {
++	ID          int64  `json:"id"`
++	RunID       int64  `json:"runId"`
++	Level       string `json:"level"`
++	Message     string `json:"message"`
++	DetailJSON  string `json:"-"`
++	Detail      any    `json:"detail,omitempty"`
++	CreatedAtMS int64  `json:"createdAtMs"`
++}
++
++func DefaultCodexInspectionConfig() ManagerCodexInspectionConfig {
++	return ManagerCodexInspectionConfig{
++		Enabled: boolPtr(false),
++		Schedule: ManagerCodexInspectionScheduleConfig{
++			Mode:            CodexInspectionScheduleModeInterval,
++			IntervalMinutes: 60,
++		},
++		TargetType:           "codex",
++		Workers:              4,
++		DeleteWorkers:        4,
++		Timeout:              15000,
++		Retries:              0,
++		UserAgent:            "codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal",
++		UsedPercentThreshold: 100,
++		SampleSize:           0,
++		AutoActionMode:       CodexInspectionAutoActionNone,
++	}
++}
++
++func NormalizeCodexInspectionConfig(input ManagerCodexInspectionConfig, fallback ManagerCodexInspectionConfig) ManagerCodexInspectionConfig {
++	base := fallback
++	if base.TargetType == "" {
++		base = DefaultCodexInspectionConfig()
++	}
++
++	next := base
++	if input.Enabled != nil {
++		next.Enabled = boolPtr(*input.Enabled)
++	}
++	next.Schedule = NormalizeCodexInspectionSchedule(input.Schedule, base.Schedule)
++	next.TargetType = valueOrLower(input.TargetType, base.TargetType)
++	next.Workers = positiveOr(input.Workers, base.Workers)
++	next.DeleteWorkers = positiveOr(input.DeleteWorkers, positiveOr(input.Workers, base.DeleteWorkers))
++	next.Timeout = positiveOr(input.Timeout, base.Timeout)
++	// Retries and SampleSize intentionally accept zero as an explicit value.
++	// Frontend config submissions write complete config objects, so omitted
++	// fields are indistinguishable from zero in this non-pointer schema.
++	if input.Retries >= 0 {
++		next.Retries = input.Retries
++	}
++	next.UserAgent = valueOr(input.UserAgent, base.UserAgent)
++	next.UsedPercentThreshold = normalizePercent(input.UsedPercentThreshold, base.UsedPercentThreshold)
++	if input.SampleSize >= 0 {
++		next.SampleSize = input.SampleSize
++	}
++	next.AutoActionMode = NormalizeCodexInspectionAutoActionMode(input.AutoActionMode, base.AutoActionMode)
++	return next
++}
++
++func NormalizeCodexInspectionSchedule(input ManagerCodexInspectionScheduleConfig, fallback ManagerCodexInspectionScheduleConfig) ManagerCodexInspectionScheduleConfig {
++	fallbackTimeZone := strings.TrimSpace(fallback.TimeZone)
++	base := fallback
++	if base.Mode == "" {
++		base = DefaultCodexInspectionConfig().Schedule
++	}
++	next := base
++
++	timePoints := NormalizeCodexInspectionTimePoints(input.TimePoints)
++	if len(timePoints) > 0 {
++		next.TimePoints = timePoints
++	}
++	if input.IntervalMinutes > 0 {
++		next.IntervalMinutes = input.IntervalMinutes
++	}
++	next.TimeZone = NormalizeCodexInspectionTimeZone(input.TimeZone, fallbackTimeZone)
++
++	switch strings.ToLower(strings.TrimSpace(input.Mode)) {
++	case CodexInspectionScheduleModeTimePoints:
++		next.Mode = CodexInspectionScheduleModeTimePoints
++	case CodexInspectionScheduleModeInterval:
++		next.Mode = CodexInspectionScheduleModeInterval
++	case "":
++		if len(timePoints) > 0 {
++			next.Mode = CodexInspectionScheduleModeTimePoints
++		} else if input.IntervalMinutes > 0 {
++			next.Mode = CodexInspectionScheduleModeInterval
++		}
++	}
++
++	if next.Mode == CodexInspectionScheduleModeTimePoints && len(next.TimePoints) == 0 {
++		next.Mode = CodexInspectionScheduleModeInterval
++	}
++	if next.Mode == CodexInspectionScheduleModeInterval && next.IntervalMinutes <= 0 {
++		next.IntervalMinutes = 60
++	}
++	return next
++}
++
++// NormalizeCodexInspectionTimeZone validates IANA time zone strings via
++// time.LoadLocation. Empty/invalid values fall back to the provided default
++// (which may itself be empty, meaning the server's local time zone).
++func NormalizeCodexInspectionTimeZone(value string, fallback string) string {
++	trimmed := strings.TrimSpace(value)
++	if trimmed == "" {
++		return strings.TrimSpace(fallback)
++	}
++	if _, err := time.LoadLocation(trimmed); err != nil {
++		return strings.TrimSpace(fallback)
++	}
++	return trimmed
++}
++
++func ValidateCodexInspectionConfig(input ManagerCodexInspectionConfig) error {
++	return ValidateCodexInspectionSchedule(input.Schedule)
++}
++
++func ValidateCodexInspectionSchedule(input ManagerCodexInspectionScheduleConfig) error {
++	return ValidateCodexInspectionTimeZone(input.TimeZone)
++}
++
++func ValidateCodexInspectionTimeZone(value string) error {
++	trimmed := strings.TrimSpace(value)
++	if trimmed == "" {
++		return nil
++	}
++	if _, err := time.LoadLocation(trimmed); err != nil {
++		return fmt.Errorf("invalid time zone %q: %w", trimmed, err)
++	}
++	return nil
++}
++
++// ResolveCodexInspectionLocation returns the time.Location for the schedule.
++// An empty or invalid time zone resolves to time.Local so existing deployments
++// keep using the server's local time.
++func ResolveCodexInspectionLocation(tz string) *time.Location {
++	trimmed := strings.TrimSpace(tz)
++	if trimmed == "" {
++		return time.Local
++	}
++	loc, err := time.LoadLocation(trimmed)
++	if err != nil {
++		return time.Local
++	}
++	return loc
++}
++
++func NormalizeCodexInspectionTimePoints(values []string) []string {
++	seen := map[string]struct{}{}
++	result := make([]string, 0, len(values))
++	for _, value := range values {
++		normalized, ok := NormalizeCodexInspectionTimePoint(value)
++		if !ok {
++			continue
++		}
++		if _, exists := seen[normalized]; exists {
++			continue
++		}
++		seen[normalized] = struct{}{}
++		result = append(result, normalized)
++	}
++	sort.Strings(result)
++	return result
++}
++
++func NormalizeCodexInspectionTimePoint(value string) (string, bool) {
++	parts := strings.Split(strings.TrimSpace(value), ":")
++	if len(parts) != 2 {
++		return "", false
++	}
++	hour, err := strconv.Atoi(parts[0])
++	if err != nil || hour < 0 || hour > 23 {
++		return "", false
++	}
++	minute, err := strconv.Atoi(parts[1])
++	if err != nil || minute < 0 || minute > 59 {
++		return "", false
++	}
++	return fmt.Sprintf("%02d:%02d", hour, minute), true
++}
++
++func NormalizeCodexInspectionAutoActionMode(value string, fallback string) string {
++	switch strings.ToLower(strings.TrimSpace(value)) {
++	case CodexInspectionAutoActionEnable:
++		return CodexInspectionAutoActionEnable
++	case CodexInspectionAutoActionDisable:
++		return CodexInspectionAutoActionDisable
++	case CodexInspectionAutoActionDelete:
++		return CodexInspectionAutoActionDelete
++	case CodexInspectionAutoActionNone:
++		return CodexInspectionAutoActionNone
++	default:
++		if fallback == CodexInspectionAutoActionEnable ||
++			fallback == CodexInspectionAutoActionDisable ||
++			fallback == CodexInspectionAutoActionDelete {
++			return fallback
++		}
++		return CodexInspectionAutoActionNone
++	}
++}
++
++func NormalizeCodexInspectionActionStatus(value string, action string) string {
++	switch strings.ToLower(strings.TrimSpace(value)) {
++	case CodexInspectionActionStatusNone:
++		return CodexInspectionActionStatusNone
++	case CodexInspectionActionStatusSuccess:
++		return CodexInspectionActionStatusSuccess
++	case CodexInspectionActionStatusFailed:
++		return CodexInspectionActionStatusFailed
++	case CodexInspectionActionStatusSkipped:
++		return CodexInspectionActionStatusSkipped
++	case CodexInspectionActionStatusNeedsReview:
++		return CodexInspectionActionStatusNeedsReview
++	case CodexInspectionActionStatusPending:
++		return CodexInspectionActionStatusPending
++	default:
++		switch strings.ToLower(strings.TrimSpace(action)) {
++		case CodexInspectionAutoActionDelete, CodexInspectionAutoActionDisable, CodexInspectionAutoActionEnable:
++			return CodexInspectionActionStatusPending
++		default:
++			return CodexInspectionActionStatusNone
++		}
++	}
++}
++
++func MarshalCodexInspectionSettings(settings ManagerCodexInspectionConfig) string {
++	data, err := json.Marshal(settings)
++	if err != nil {
++		return "{}"
++	}
++	return string(data)
++}
++
++func UnmarshalCodexInspectionSettings(raw string) ManagerCodexInspectionConfig {
++	settings := DefaultCodexInspectionConfig()
++	if strings.TrimSpace(raw) == "" {
++		return settings
++	}
++	var parsed ManagerCodexInspectionConfig
++	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
++		return settings
++	}
++	return NormalizeCodexInspectionConfig(parsed, settings)
++}
++
++func CodexInspectionTriggerKey(now time.Time, cfg ManagerCodexInspectionConfig) string {
++	schedule := cfg.Schedule
++	switch schedule.Mode {
++	case CodexInspectionScheduleModeTimePoints:
++		return now.In(ResolveCodexInspectionLocation(schedule.TimeZone)).Format("2006-01-02 15:04")
++	case CodexInspectionScheduleModeInterval:
++		if schedule.IntervalMinutes <= 0 {
++			return now.Format("2006-01-02T15:04")
++		}
++		bucket := now.Unix() / int64(schedule.IntervalMinutes*60)
++		return fmt.Sprintf("interval:%d:%d", schedule.IntervalMinutes, bucket)
++	default:
++		return now.Format("2006-01-02T15:04")
++	}
++}
++
++func CodexInspectionScheduleDue(now time.Time, lastRun time.Time, cfg ManagerCodexInspectionConfig) bool {
++	if cfg.Enabled == nil || !*cfg.Enabled {
++		return false
++	}
++	switch cfg.Schedule.Mode {
++	case CodexInspectionScheduleModeTimePoints:
++		current := now.In(ResolveCodexInspectionLocation(cfg.Schedule.TimeZone)).Format("15:04")
++		for _, point := range cfg.Schedule.TimePoints {
++			if point == current {
++				return true
++			}
++		}
++		return false
++	case CodexInspectionScheduleModeInterval:
++		if cfg.Schedule.IntervalMinutes <= 0 {
++			return false
++		}
++		if lastRun.IsZero() {
++			return true
++		}
++		return now.Sub(lastRun) >= time.Duration(cfg.Schedule.IntervalMinutes)*time.Minute
++	default:
++		return false
++	}
++}
++
++func valueOr(value string, fallback string) string {
++	if strings.TrimSpace(value) == "" {
++		return fallback
++	}
++	return strings.TrimSpace(value)
++}
++
++func valueOrLower(value string, fallback string) string {
++	if strings.TrimSpace(value) == "" {
++		return fallback
++	}
++	return strings.ToLower(strings.TrimSpace(value))
++}
++
++func positiveOr(value int, fallback int) int {
++	if value > 0 {
++		return value
++	}
++	return fallback
++}
++
++func normalizePercent(value float64, fallback float64) float64 {
++	if value == 0 {
++		return fallback
++	}
++	if value > 0 && value <= 1 {
++		value *= 100
++	}
++	if value < 0 || value > 100 {
++		return fallback
++	}
++	return value
++}
++
++func boolPtr(value bool) *bool {
++	return &value
++}
+diff --git a/internal/plusmanager/model/manager_config.go b/internal/plusmanager/model/manager_config.go
+new file mode 100644
+index 00000000..5f325edd
+--- /dev/null
++++ b/internal/plusmanager/model/manager_config.go
+@@ -0,0 +1,30 @@
++package model
++
++type ManagerConfig struct {
++	CPAConnection        ManagerCPAConnectionConfig        `json:"cpaConnection"`
++	Collector            ManagerCollectorConfig            `json:"collector"`
++	CodexInspection      ManagerCodexInspectionConfig      `json:"codexInspection"`
++	ExternalUsageService ManagerExternalUsageServiceConfig `json:"externalUsageService"`
++	UpdatedAtMS          int64                             `json:"updatedAtMs,omitempty"`
++}
++
++type ManagerCPAConnectionConfig struct {
++	CPABaseURL    string `json:"cpaBaseUrl"`
++	ManagementKey string `json:"managementKey,omitempty"`
++}
++
++type ManagerCollectorConfig struct {
++	Enabled        *bool  `json:"enabled,omitempty"`
++	CollectorMode  string `json:"collectorMode,omitempty"`
++	Queue          string `json:"queue,omitempty"`
++	PopSide        string `json:"popSide,omitempty"`
++	BatchSize      int    `json:"batchSize,omitempty"`
++	PollIntervalMS int    `json:"pollIntervalMs,omitempty"`
++	QueryLimit     int    `json:"queryLimit,omitempty"`
++	TLSSkipVerify  bool   `json:"tlsSkipVerify,omitempty"`
++}
++
++type ManagerExternalUsageServiceConfig struct {
++	Enabled     bool   `json:"enabled"`
++	ServiceBase string `json:"serviceBase,omitempty"`
 +}
 diff --git a/internal/plusmanager/model/model_price.go b/internal/plusmanager/model/model_price.go
 new file mode 100644
@@ -4728,6 +7826,26 @@ index 00000000..297c7436
 +	RawJSON       string  `json:"rawJson,omitempty"`
 +	UpdatedAtMS   int64   `json:"updatedAtMs,omitempty"`
 +	SyncedAtMS    *int64  `json:"syncedAtMs,omitempty"`
++}
+diff --git a/internal/plusmanager/model/setup.go b/internal/plusmanager/model/setup.go
+new file mode 100644
+index 00000000..4b02b554
+--- /dev/null
++++ b/internal/plusmanager/model/setup.go
+@@ -0,0 +1,14 @@
++package model
++
++import "fmt"
++
++type Setup struct {
++	CPAUpstreamURL string `json:"cpaBaseUrl"`
++	ManagementKey  string `json:"managementKey,omitempty"`
++	Queue          string `json:"queue,omitempty"`
++	PopSide        string `json:"popSide,omitempty"`
++}
++
++func (s Setup) String() string {
++	return fmt.Sprintf("upstream=%s queue=%s popSide=%s", s.CPAUpstreamURL, s.Queue, s.PopSide)
 +}
 diff --git a/internal/plusmanager/model/usage.go b/internal/plusmanager/model/usage.go
 new file mode 100644
@@ -4853,10 +7971,10 @@ index 00000000..bc15869e
 +}
 diff --git a/internal/plusmanager/store/store.go b/internal/plusmanager/store/store.go
 new file mode 100644
-index 00000000..27a05b5a
+index 00000000..81b4df9d
 --- /dev/null
 +++ b/internal/plusmanager/store/store.go
-@@ -0,0 +1,850 @@
+@@ -0,0 +1,1333 @@
 +package store
 +
 +import (
@@ -4882,6 +8000,18 @@ index 00000000..27a05b5a
 +type UsageImportResult = model.UsageImportResult
 +type UsagePayload = model.UsagePayload
 +type UsageQuery = model.UsageQuery
++type ManagerConfig = model.ManagerConfig
++type ManagerCPAConnectionConfig = model.ManagerCPAConnectionConfig
++type ManagerCollectorConfig = model.ManagerCollectorConfig
++type ManagerCodexInspectionConfig = model.ManagerCodexInspectionConfig
++type ManagerExternalUsageServiceConfig = model.ManagerExternalUsageServiceConfig
++type Setup = model.Setup
++type CodexInspectionRun = model.CodexInspectionRun
++type CodexInspectionResult = model.CodexInspectionResult
++type CodexInspectionLog = model.CodexInspectionLog
++
++var DefaultCodexInspectionConfig = model.DefaultCodexInspectionConfig
++var NormalizeCodexInspectionConfig = model.NormalizeCodexInspectionConfig
 +
 +type Store struct {
 +	db *sql.DB
@@ -4923,6 +8053,103 @@ index 00000000..27a05b5a
 +		alias TEXT NOT NULL,
 +		updated_at_ms INTEGER NOT NULL
 +	)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS settings (
++		key TEXT PRIMARY KEY,
++		value TEXT NOT NULL,
++		updated_at_ms INTEGER NOT NULL
++	)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS codex_inspection_runs (
++		id INTEGER PRIMARY KEY AUTOINCREMENT,
++		trigger_type TEXT NOT NULL,
++		trigger_key TEXT,
++		status TEXT NOT NULL,
++		started_at_ms INTEGER NOT NULL,
++		finished_at_ms INTEGER,
++		total_files INTEGER NOT NULL DEFAULT 0,
++		probe_set_count INTEGER NOT NULL DEFAULT 0,
++		sampled_count INTEGER NOT NULL DEFAULT 0,
++		disabled_count INTEGER NOT NULL DEFAULT 0,
++		enabled_count INTEGER NOT NULL DEFAULT 0,
++		delete_count INTEGER NOT NULL DEFAULT 0,
++		disable_count INTEGER NOT NULL DEFAULT 0,
++		enable_count INTEGER NOT NULL DEFAULT 0,
++		reauth_count INTEGER NOT NULL DEFAULT 0,
++		keep_count INTEGER NOT NULL DEFAULT 0,
++		error TEXT,
++		settings_json TEXT NOT NULL,
++		created_at_ms INTEGER NOT NULL,
++		updated_at_ms INTEGER NOT NULL
++	)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_codex_inspection_runs_started_at ON codex_inspection_runs(started_at_ms)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_codex_inspection_runs_status ON codex_inspection_runs(status)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_codex_inspection_runs_trigger ON codex_inspection_runs(trigger_type, trigger_key)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS codex_inspection_results (
++		id INTEGER PRIMARY KEY AUTOINCREMENT,
++		run_id INTEGER NOT NULL,
++		account_key TEXT NOT NULL,
++		file_name TEXT NOT NULL,
++		display_account TEXT NOT NULL,
++		auth_index TEXT,
++		account_id TEXT,
++		provider TEXT,
++		disabled INTEGER NOT NULL DEFAULT 0,
++		status TEXT,
++		state TEXT,
++		action TEXT NOT NULL,
++		action_reason TEXT,
++		action_status TEXT,
++		executed_action TEXT,
++		action_error TEXT,
++		status_code INTEGER,
++		used_percent REAL,
++		is_quota INTEGER NOT NULL DEFAULT 0,
++		error TEXT,
++		created_at_ms INTEGER NOT NULL,
++		FOREIGN KEY(run_id) REFERENCES codex_inspection_runs(id) ON DELETE CASCADE,
++		UNIQUE(run_id, account_key)
++	)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_codex_inspection_results_run ON codex_inspection_results(run_id)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS codex_inspection_logs (
++		id INTEGER PRIMARY KEY AUTOINCREMENT,
++		run_id INTEGER NOT NULL,
++		level TEXT NOT NULL,
++		message TEXT NOT NULL,
++		detail_json TEXT,
++		created_at_ms INTEGER NOT NULL,
++		FOREIGN KEY(run_id) REFERENCES codex_inspection_runs(id) ON DELETE CASCADE
++	)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_codex_inspection_logs_run ON codex_inspection_logs(run_id, created_at_ms)`); err != nil {
++		db.Close()
++		return nil, err
++	}
++	if err := ensureCodexInspectionColumns(db); err != nil {
 +		db.Close()
 +		return nil, err
 +	}
@@ -5707,6 +8934,380 @@ index 00000000..27a05b5a
 +	}
 +	return true
 +}
++
++const managerConfigKey = "manager_config_v1"
++
++func (s *Store) SaveManagerConfig(ctx context.Context, cfg ManagerConfig) error {
++	cfg.UpdatedAtMS = time.Now().UnixMilli()
++	data, err := json.Marshal(cfg)
++	if err != nil {
++		return err
++	}
++	_, err = s.db.ExecContext(ctx, `INSERT INTO settings(key, value, updated_at_ms)
++		VALUES(?, ?, ?)
++		ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at_ms = excluded.updated_at_ms`,
++		managerConfigKey, string(data), cfg.UpdatedAtMS)
++	return err
++}
++
++func (s *Store) LoadManagerConfig(ctx context.Context) (ManagerConfig, bool, error) {
++	var raw string
++	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = ?`, managerConfigKey).Scan(&raw)
++	if errors.Is(err, sql.ErrNoRows) {
++		return ManagerConfig{}, false, nil
++	}
++	if err != nil {
++		return ManagerConfig{}, false, err
++	}
++	var cfg ManagerConfig
++	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
++		return ManagerConfig{}, false, err
++	}
++	return cfg, true, nil
++}
++
++func (s *Store) CreateCodexInspectionRun(ctx context.Context, run CodexInspectionRun) (CodexInspectionRun, error) {
++	now := time.Now().UnixMilli()
++	if run.StartedAtMS <= 0 {
++		run.StartedAtMS = now
++	}
++	if run.CreatedAtMS <= 0 {
++		run.CreatedAtMS = now
++	}
++	run.UpdatedAtMS = now
++	if run.Status == "" {
++		run.Status = model.CodexInspectionStatusRunning
++	}
++	if run.SettingsJSON == "" {
++		run.SettingsJSON = model.MarshalCodexInspectionSettings(run.Settings)
++	}
++	res, err := s.db.ExecContext(ctx, `INSERT INTO codex_inspection_runs (
++		trigger_type, trigger_key, status, started_at_ms, finished_at_ms,
++		total_files, probe_set_count, sampled_count, disabled_count, enabled_count,
++		delete_count, disable_count, enable_count, reauth_count, keep_count, error,
++		settings_json, created_at_ms, updated_at_ms
++	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
++		run.TriggerType, nullString(run.TriggerKey), run.Status, run.StartedAtMS, nullPositiveInt64(run.FinishedAtMS),
++		run.TotalFiles, run.ProbeSetCount, run.SampledCount, run.DisabledCount, run.EnabledCount,
++		run.DeleteCount, run.DisableCount, run.EnableCount, run.ReauthCount, run.KeepCount, nullString(run.Error),
++		run.SettingsJSON, run.CreatedAtMS, run.UpdatedAtMS)
++	if err != nil {
++		return CodexInspectionRun{}, err
++	}
++	id, err := res.LastInsertId()
++	if err != nil {
++		return CodexInspectionRun{}, err
++	}
++	run.ID = id
++	return run, nil
++}
++
++func (s *Store) UpdateCodexInspectionRun(ctx context.Context, run CodexInspectionRun) error {
++	if run.ID <= 0 {
++		return errors.New("codex inspection run id is required")
++	}
++	run.UpdatedAtMS = time.Now().UnixMilli()
++	if run.SettingsJSON == "" {
++		run.SettingsJSON = model.MarshalCodexInspectionSettings(run.Settings)
++	}
++	_, err := s.db.ExecContext(ctx, `UPDATE codex_inspection_runs SET
++		status = ?, finished_at_ms = ?, total_files = ?, probe_set_count = ?, sampled_count = ?,
++		disabled_count = ?, enabled_count = ?, delete_count = ?, disable_count = ?, enable_count = ?,
++		reauth_count = ?, keep_count = ?, error = ?, settings_json = ?, updated_at_ms = ?
++		WHERE id = ?`,
++		run.Status, nullPositiveInt64(run.FinishedAtMS), run.TotalFiles, run.ProbeSetCount, run.SampledCount,
++		run.DisabledCount, run.EnabledCount, run.DeleteCount, run.DisableCount, run.EnableCount,
++		run.ReauthCount, run.KeepCount, nullString(run.Error), run.SettingsJSON, run.UpdatedAtMS, run.ID)
++	return err
++}
++
++func (s *Store) InsertCodexInspectionResult(ctx context.Context, result CodexInspectionResult) (CodexInspectionResult, error) {
++	if result.CreatedAtMS <= 0 {
++		result.CreatedAtMS = time.Now().UnixMilli()
++	}
++	result.ActionStatus = model.NormalizeCodexInspectionActionStatus(result.ActionStatus, result.Action)
++	disabled, isQuota := 0, 0
++	if result.Disabled {
++		disabled = 1
++	}
++	if result.IsQuota {
++		isQuota = 1
++	}
++	res, err := s.db.ExecContext(ctx, `INSERT INTO codex_inspection_results (
++		run_id, account_key, file_name, display_account, auth_index, account_id,
++		provider, disabled, status, state, action, action_reason, status_code,
++		used_percent, is_quota, error, action_status, executed_action, action_error, created_at_ms
++	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
++	ON CONFLICT(run_id, account_key) DO UPDATE SET
++		file_name = excluded.file_name, display_account = excluded.display_account,
++		auth_index = excluded.auth_index, account_id = excluded.account_id, provider = excluded.provider,
++		disabled = excluded.disabled, status = excluded.status, state = excluded.state,
++		action = excluded.action, action_reason = excluded.action_reason, status_code = excluded.status_code,
++		used_percent = excluded.used_percent, is_quota = excluded.is_quota, error = excluded.error,
++		action_status = excluded.action_status, executed_action = excluded.executed_action,
++		action_error = excluded.action_error, created_at_ms = excluded.created_at_ms`,
++		result.RunID, result.AccountKey, result.FileName, result.DisplayAccount, nullString(result.AuthIndex), nullString(result.AccountID),
++		nullString(result.Provider), disabled, nullString(result.Status), nullString(result.State), result.Action, nullString(result.ActionReason),
++		nullInt(result.StatusCode), nullFloat(result.UsedPercent), isQuota, nullString(result.Error), nullString(result.ActionStatus),
++		nullString(result.ExecutedAction), nullString(result.ActionError), result.CreatedAtMS)
++	if err != nil {
++		return CodexInspectionResult{}, err
++	}
++	id, _ := res.LastInsertId()
++	result.ID = id
++	return result, nil
++}
++
++func (s *Store) InsertCodexInspectionLog(ctx context.Context, entry CodexInspectionLog) (CodexInspectionLog, error) {
++	if entry.CreatedAtMS <= 0 {
++		entry.CreatedAtMS = time.Now().UnixMilli()
++	}
++	if entry.DetailJSON == "" && entry.Detail != nil {
++		if data, err := json.Marshal(entry.Detail); err == nil {
++			entry.DetailJSON = string(data)
++		}
++	}
++	res, err := s.db.ExecContext(ctx, `INSERT INTO codex_inspection_logs(run_id, level, message, detail_json, created_at_ms) VALUES(?, ?, ?, ?, ?)`,
++		entry.RunID, entry.Level, entry.Message, nullString(entry.DetailJSON), entry.CreatedAtMS)
++	if err != nil {
++		return CodexInspectionLog{}, err
++	}
++	id, _ := res.LastInsertId()
++	entry.ID = id
++	return entry, nil
++}
++
++func (s *Store) ListCodexInspectionRuns(ctx context.Context, limit int) ([]CodexInspectionRun, error) {
++	if limit <= 0 || limit > 200 {
++		limit = 50
++	}
++	rows, err := s.db.QueryContext(ctx, `SELECT id, trigger_type, trigger_key, status, started_at_ms, finished_at_ms,
++		total_files, probe_set_count, sampled_count, disabled_count, enabled_count,
++		delete_count, disable_count, enable_count, reauth_count, keep_count, error,
++		settings_json, created_at_ms, updated_at_ms
++		FROM codex_inspection_runs ORDER BY started_at_ms DESC, id DESC LIMIT ?`, limit)
++	if err != nil {
++		return nil, err
++	}
++	defer rows.Close()
++	var runs []CodexInspectionRun
++	for rows.Next() {
++		run, err := scanCodexInspectionRun(rows)
++		if err != nil {
++			return nil, err
++		}
++		runs = append(runs, run)
++	}
++	return runs, rows.Err()
++}
++
++func (s *Store) GetCodexInspectionRun(ctx context.Context, id int64) (CodexInspectionRun, bool, error) {
++	row := s.db.QueryRowContext(ctx, `SELECT id, trigger_type, trigger_key, status, started_at_ms, finished_at_ms,
++		total_files, probe_set_count, sampled_count, disabled_count, enabled_count,
++		delete_count, disable_count, enable_count, reauth_count, keep_count, error,
++		settings_json, created_at_ms, updated_at_ms FROM codex_inspection_runs WHERE id = ?`, id)
++	run, err := scanCodexInspectionRun(row)
++	if errors.Is(err, sql.ErrNoRows) {
++		return CodexInspectionRun{}, false, nil
++	}
++	if err != nil {
++		return CodexInspectionRun{}, false, err
++	}
++	return run, true, nil
++}
++
++func (s *Store) GetLatestCodexInspectionRunByTrigger(ctx context.Context, triggerType, triggerKey string) (CodexInspectionRun, bool, error) {
++	row := s.db.QueryRowContext(ctx, `SELECT id, trigger_type, trigger_key, status, started_at_ms, finished_at_ms,
++		total_files, probe_set_count, sampled_count, disabled_count, enabled_count,
++		delete_count, disable_count, enable_count, reauth_count, keep_count, error,
++		settings_json, created_at_ms, updated_at_ms FROM codex_inspection_runs
++		WHERE trigger_type = ? AND trigger_key = ? ORDER BY started_at_ms DESC, id DESC LIMIT 1`, triggerType, triggerKey)
++	run, err := scanCodexInspectionRun(row)
++	if errors.Is(err, sql.ErrNoRows) {
++		return CodexInspectionRun{}, false, nil
++	}
++	if err != nil {
++		return CodexInspectionRun{}, false, err
++	}
++	return run, true, nil
++}
++
++func (s *Store) ListCodexInspectionResults(ctx context.Context, runID int64) ([]CodexInspectionResult, error) {
++	rows, err := s.db.QueryContext(ctx, `SELECT id, run_id, account_key, file_name, display_account, auth_index, account_id,
++		provider, disabled, status, state, action, action_reason, status_code,
++		used_percent, is_quota, error, action_status, executed_action, action_error, created_at_ms
++		FROM codex_inspection_results WHERE run_id = ? ORDER BY file_name ASC, display_account ASC, id ASC`, runID)
++	if err != nil {
++		return nil, err
++	}
++	defer rows.Close()
++	var results []CodexInspectionResult
++	for rows.Next() {
++		result, err := scanCodexInspectionResult(rows)
++		if err != nil {
++			return nil, err
++		}
++		results = append(results, result)
++	}
++	return results, rows.Err()
++}
++
++func (s *Store) ListCodexInspectionLogs(ctx context.Context, runID int64) ([]CodexInspectionLog, error) {
++	rows, err := s.db.QueryContext(ctx, `SELECT id, run_id, level, message, detail_json, created_at_ms
++		FROM codex_inspection_logs WHERE run_id = ? ORDER BY created_at_ms ASC, id ASC`, runID)
++	if err != nil {
++		return nil, err
++	}
++	defer rows.Close()
++	var logs []CodexInspectionLog
++	for rows.Next() {
++		entry, err := scanCodexInspectionLog(rows)
++		if err != nil {
++			return nil, err
++		}
++		logs = append(logs, entry)
++	}
++	return logs, rows.Err()
++}
++
++type sqlScanner interface{ Scan(dest ...any) error }
++
++func scanCodexInspectionRun(row sqlScanner) (CodexInspectionRun, error) {
++	var run CodexInspectionRun
++	var triggerKey, errorText sql.NullString
++	var finishedAt sql.NullInt64
++	if err := row.Scan(&run.ID, &run.TriggerType, &triggerKey, &run.Status, &run.StartedAtMS, &finishedAt,
++		&run.TotalFiles, &run.ProbeSetCount, &run.SampledCount, &run.DisabledCount, &run.EnabledCount,
++		&run.DeleteCount, &run.DisableCount, &run.EnableCount, &run.ReauthCount, &run.KeepCount, &errorText,
++		&run.SettingsJSON, &run.CreatedAtMS, &run.UpdatedAtMS); err != nil {
++		return CodexInspectionRun{}, err
++	}
++	run.TriggerKey = triggerKey.String
++	run.Error = errorText.String
++	if finishedAt.Valid {
++		run.FinishedAtMS = finishedAt.Int64
++	}
++	run.Settings = model.UnmarshalCodexInspectionSettings(run.SettingsJSON)
++	return run, nil
++}
++
++func scanCodexInspectionResult(row sqlScanner) (CodexInspectionResult, error) {
++	var result CodexInspectionResult
++	var authIndex, accountID, provider, status, state, actionReason, errorText sql.NullString
++	var actionStatus, executedAction, actionError sql.NullString
++	var statusCode sql.NullInt64
++	var usedPercent sql.NullFloat64
++	var disabled, isQuota int
++	if err := row.Scan(&result.ID, &result.RunID, &result.AccountKey, &result.FileName, &result.DisplayAccount,
++		&authIndex, &accountID, &provider, &disabled, &status, &state, &result.Action, &actionReason,
++		&statusCode, &usedPercent, &isQuota, &errorText, &actionStatus, &executedAction, &actionError,
++		&result.CreatedAtMS); err != nil {
++		return CodexInspectionResult{}, err
++	}
++	result.AuthIndex = authIndex.String
++	result.AccountID = accountID.String
++	result.Provider = provider.String
++	result.Disabled = disabled != 0
++	result.Status = status.String
++	result.State = state.String
++	result.ActionReason = actionReason.String
++	result.IsQuota = isQuota != 0
++	result.Error = errorText.String
++	result.ActionStatus = model.NormalizeCodexInspectionActionStatus(actionStatus.String, result.Action)
++	result.ExecutedAction = executedAction.String
++	result.ActionError = actionError.String
++	if statusCode.Valid {
++		value := int(statusCode.Int64)
++		result.StatusCode = &value
++	}
++	if usedPercent.Valid {
++		value := usedPercent.Float64
++		result.UsedPercent = &value
++	}
++	return result, nil
++}
++
++func scanCodexInspectionLog(row sqlScanner) (CodexInspectionLog, error) {
++	var entry CodexInspectionLog
++	var detail sql.NullString
++	if err := row.Scan(&entry.ID, &entry.RunID, &entry.Level, &entry.Message, &detail, &entry.CreatedAtMS); err != nil {
++		return CodexInspectionLog{}, err
++	}
++	entry.DetailJSON = detail.String
++	if detail.Valid && detail.String != "" {
++		var parsed any
++		if err := json.Unmarshal([]byte(detail.String), &parsed); err == nil {
++			entry.Detail = parsed
++		}
++	}
++	return entry, nil
++}
++
++func ensureCodexInspectionColumns(db *sql.DB) error {
++	if err := ensureTableColumns(db, "codex_inspection_runs", map[string]string{"reauth_count": "INTEGER NOT NULL DEFAULT 0"}); err != nil {
++		return err
++	}
++	return ensureTableColumns(db, "codex_inspection_results", map[string]string{
++		"action_status": "TEXT", "executed_action": "TEXT", "action_error": "TEXT",
++	})
++}
++
++func ensureTableColumns(db *sql.DB, table string, additions map[string]string) error {
++	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
++	if err != nil {
++		return err
++	}
++	defer rows.Close()
++	existing := map[string]bool{}
++	for rows.Next() {
++		var cid int
++		var name, typ string
++		var notNull int
++		var defaultValue any
++		var pk int
++		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
++			return err
++		}
++		existing[name] = true
++	}
++	if err := rows.Err(); err != nil {
++		return err
++	}
++	for name, ddl := range additions {
++		if existing[name] {
++			continue
++		}
++		if _, err := db.Exec(`ALTER TABLE ` + table + ` ADD COLUMN ` + name + ` ` + ddl); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
++func nullString(value string) any {
++	if value == "" {
++		return nil
++	}
++	return value
++}
++func nullPositiveInt64(value int64) any {
++	if value <= 0 {
++		return nil
++	}
++	return value
++}
++func nullInt(value *int) any {
++	if value == nil {
++		return nil
++	}
++	return *value
++}
++func nullFloat(value *float64) any {
++	if value == nil {
++		return nil
++	}
++	return *value
++}
 diff --git a/internal/plusmanager/store/store_test.go b/internal/plusmanager/store/store_test.go
 new file mode 100644
 index 00000000..5687211a
@@ -5906,6 +9507,98 @@ index 00000000..5687211a
 +	if string(rows[0].RawJSON) == "" || string(rows[1].RawJSON) == "" {
 +		t.Fatalf("ExportUsageEvents() raw json missing: %#v", rows)
 +	}
++}
+diff --git a/internal/plusmanager/worker/codex_inspection_worker.go b/internal/plusmanager/worker/codex_inspection_worker.go
+new file mode 100644
+index 00000000..fb4d16a6
+--- /dev/null
++++ b/internal/plusmanager/worker/codex_inspection_worker.go
+@@ -0,0 +1,86 @@
++package worker
++
++import (
++	"context"
++	"log"
++	"time"
++
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/model"
++	codexinspectionservice "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/codexinspection"
++	"github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
++)
++
++type CodexInspectionWorker struct {
++	store   *store.Store
++	service *codexinspectionservice.Service
++}
++
++func NewCodexInspectionWorker(store *store.Store, service *codexinspectionservice.Service) *CodexInspectionWorker {
++	return &CodexInspectionWorker{store: store, service: service}
++}
++
++func (w *CodexInspectionWorker) Start(ctx context.Context) {
++	if w == nil || w.service == nil {
++		return
++	}
++	go w.run(ctx)
++}
++
++func (w *CodexInspectionWorker) run(ctx context.Context) {
++	ticker := time.NewTicker(30 * time.Second)
++	defer ticker.Stop()
++
++	w.tick(ctx)
++	for {
++		select {
++		case <-ctx.Done():
++			return
++		case <-ticker.C:
++			w.tick(ctx)
++		}
++	}
++}
++
++func (w *CodexInspectionWorker) tick(ctx context.Context) {
++	cfg, configured, err := w.service.ResolveConfig(ctx)
++	if err != nil {
++		log.Printf("resolve codex inspection config: %v", err)
++		return
++	}
++	if !configured || cfg.Enabled == nil || !*cfg.Enabled {
++		return
++	}
++	now := time.Now()
++	triggerKey := model.CodexInspectionTriggerKey(now, cfg)
++	if triggerKey == "" || !model.CodexInspectionScheduleDue(now, w.lastScheduledRunTime(ctx), cfg) {
++		return
++	}
++	if _, ok, err := w.store.GetLatestCodexInspectionRunByTrigger(ctx, model.CodexInspectionTriggerScheduled, triggerKey); err != nil {
++		log.Printf("load codex inspection trigger: %v", err)
++		return
++	} else if ok {
++		return
++	}
++	go func() {
++		if _, err := w.service.Run(ctx, codexinspectionservice.RunRequest{
++			TriggerType: model.CodexInspectionTriggerScheduled,
++			TriggerKey:  triggerKey,
++		}); err != nil && err != codexinspectionservice.ErrRunAlreadyActive {
++			log.Printf("run scheduled codex inspection: %v", err)
++		}
++	}()
++}
++
++func (w *CodexInspectionWorker) lastScheduledRunTime(ctx context.Context) time.Time {
++	runs, err := w.store.ListCodexInspectionRuns(ctx, 20)
++	if err != nil {
++		return time.Time{}
++	}
++	for _, run := range runs {
++		if run.TriggerType != model.CodexInspectionTriggerScheduled || run.StartedAtMS <= 0 {
++			continue
++		}
++		return time.UnixMilli(run.StartedAtMS)
++	}
++	return time.Time{}
 +}
 diff --git a/scripts/local-update-all.sh b/scripts/local-update-all.sh
 new file mode 100755
