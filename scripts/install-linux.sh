@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_DIR="${CPA_PLUS_APP_DIR:-/root/apps/cliproxyapi-plus}"
-PORT="${CPA_PLUS_PORT:-8318}"
+PORT="${CPA_PLUS_PORT:-$(cat "${ROOT_DIR}/PORT" 2>/dev/null || echo 8318)}"
 DIST_DIR="${CPA_PLUS_DIST_DIR:-${ROOT_DIR}/dist}"
 BINARY_NAME="${CPA_PLUS_BINARY_NAME:-CLIProxyAPI-linux-amd64}"
 SOURCE_DIR="${CPA_PLUS_OUTPUT_SOURCE:-${ROOT_DIR}/.build/out/CLIProxyAPI}"
@@ -11,6 +11,7 @@ SOURCE_DIR="${CPA_PLUS_OUTPUT_SOURCE:-${ROOT_DIR}/.build/out/CLIProxyAPI}"
 "${ROOT_DIR}/scripts/build-linux-binary.sh" "$@"
 
 mkdir -p "${APP_DIR}/data" "${APP_DIR}/logs" "${APP_DIR}/static"
+printf "%s\n" "${PORT}" > "${APP_DIR}/PORT"
 cp "${DIST_DIR}/${BINARY_NAME}" "${APP_DIR}/cli-proxy-api"
 chmod 755 "${APP_DIR}/cli-proxy-api"
 cp "${SOURCE_DIR}/config.example.yaml" "${APP_DIR}/config.example.yaml"

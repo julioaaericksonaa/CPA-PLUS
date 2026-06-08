@@ -128,7 +128,7 @@ if [[ "${SKIP_LOCK}" != "1" && -f "${OUT_DIR}/web/manager-plus/package.json" && 
 fi
 
 cat > "${OUT_DIR}/.cpa-plus-auto-build.env" <<META
-CPA_PLUS_AUTO_BRANCH=auto
+CPA_PLUS_BRANCH=linux
 CLI_UPSTREAM_REPO=${CLI_REPO}
 CLI_UPSTREAM_REF=${CLI_REF}
 CLI_UPSTREAM_COMMIT=$(git -C "${CLONE_DIR}" rev-parse HEAD)

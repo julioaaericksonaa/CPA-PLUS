@@ -8,7 +8,7 @@
 
 ```text
 main  = Docker 项目分支，适合容器部署和源码构建
-linux = Linux 二进制项目分支，适合直接运行二进制
+linux = Linux 二进制项目分支，适合直接运行二进制、systemd 自启动
 ```
 
 本分支目标：
@@ -16,8 +16,52 @@ linux = Linux 二进制项目分支，适合直接运行二进制
 - 生成单个 Linux 二进制：`dist/CLIProxyAPI-linux-amd64`
 - 直接运行，不依赖 Docker
 - 默认独立安装到：`/root/apps/cliproxyapi-plus`
-- 默认端口：`8318`
+- 默认端口由 `PORT` 文件维护，当前为 `8318`
 - 面板入口：`http://host:8318/management.html`
+
+## 端口维护
+
+仓库根目录有端口文件：
+
+```text
+PORT
+```
+
+默认内容：
+
+```text
+8318
+```
+
+修改默认安装端口：
+
+```bash
+echo 8318 > PORT
+```
+
+也可以安装时临时覆盖：
+
+```bash
+CPA_PLUS_PORT=8319 ./scripts/install-linux.sh --skip-tests
+```
+
+安装脚本会同步更新：
+
+```text
+/root/apps/cliproxyapi-plus/PORT
+/root/apps/cliproxyapi-plus/config.yaml
+/root/apps/cliproxyapi-plus/start-detached.sh
+/root/apps/cliproxyapi-plus/stop.sh
+/root/apps/cliproxyapi-plus/restart.sh
+```
+
+如果已经安装过，修改端口后重新执行安装或更新脚本：
+
+```bash
+./scripts/install-linux.sh --skip-tests
+# 或
+./scripts/update-linux.sh --skip-tests
+```
 
 ## 构建二进制
 
@@ -41,7 +85,7 @@ dist/CLIProxyAPI-linux-amd64
 
 ## 安装到本机
 
-默认安装到 `/root/apps/cliproxyapi-plus`，端口 `8318`：
+默认安装到 `/root/apps/cliproxyapi-plus`，端口读取 `PORT` 文件：
 
 ```bash
 ./scripts/install-linux.sh --skip-tests
@@ -60,7 +104,7 @@ remote-management:
   secret-key: "换成你自己的强密码"
 ```
 
-启动：
+手动启动：
 
 ```bash
 /root/apps/cliproxyapi-plus/start-detached.sh
@@ -72,10 +116,88 @@ remote-management:
 http://host:8318/management.html
 ```
 
+## 自动运行 / 开机自启
+
+安装二进制后，可安装 systemd 服务：
+
+```bash
+sudo ./scripts/install-systemd.sh
+```
+
+默认服务名：
+
+```text
+cliproxyapi-plus.service
+```
+
+查看状态：
+
+```bash
+systemctl status cliproxyapi-plus --no-pager
+```
+
+启动：
+
+```bash
+systemctl start cliproxyapi-plus
+```
+
+停止：
+
+```bash
+systemctl stop cliproxyapi-plus
+```
+
+重启：
+
+```bash
+systemctl restart cliproxyapi-plus
+```
+
+开机自启：
+
+```bash
+systemctl enable cliproxyapi-plus
+```
+
+取消开机自启：
+
+```bash
+systemctl disable cliproxyapi-plus
+```
+
+查看日志：
+
+```bash
+journalctl -u cliproxyapi-plus -f
+```
+
+如果你不用 systemd，也可以继续用脚本：
+
+```bash
+/root/apps/cliproxyapi-plus/start-detached.sh
+/root/apps/cliproxyapi-plus/stop.sh
+/root/apps/cliproxyapi-plus/restart.sh
+```
+
 ## 更新二进制项目
 
 ```bash
 ./scripts/update-linux.sh --skip-tests
+```
+
+如果已经安装了 systemd 服务，`update-linux.sh` 会自动：
+
+1. 拉取上游。
+2. 应用 CPA-PLUS patch。
+3. 构建新 Linux 二进制。
+4. 覆盖 `/root/apps/cliproxyapi-plus/cli-proxy-api`。
+5. 执行 `systemctl restart cliproxyapi-plus`。
+
+如果没有 systemd 服务，则调用：
+
+```bash
+/root/apps/cliproxyapi-plus/restart.sh
 ```
 
 指定上游版本：
@@ -84,38 +206,53 @@ http://host:8318/management.html
 ./scripts/update-linux.sh --cli-ref v7.1.54 --plus-ref main --skip-tests
 ```
 
-自定义安装目录和端口：
+自定义安装目录、服务名和端口：
 
 ```bash
 CPA_PLUS_APP_DIR=/root/apps/cliproxyapi-plus \
+CPA_PLUS_SERVICE_NAME=cliproxyapi-plus \
 CPA_PLUS_PORT=8318 \
 ./scripts/install-linux.sh --skip-tests
 ```
 
+安装 systemd 时也使用相同变量：
+
+```bash
+CPA_PLUS_APP_DIR=/root/apps/cliproxyapi-plus \
+CPA_PLUS_SERVICE_NAME=cliproxyapi-plus \
+sudo -E ./scripts/install-systemd.sh
+```
+
 ## 运行维护
 
-启动：
+脚本方式启动：
 
 ```bash
 /root/apps/cliproxyapi-plus/start-detached.sh
 ```
 
-停止：
+脚本方式停止：
 
 ```bash
 /root/apps/cliproxyapi-plus/stop.sh
 ```
 
-重启：
+脚本方式重启：
 
 ```bash
 /root/apps/cliproxyapi-plus/restart.sh
 ```
 
-日志：
+应用日志：
 
 ```bash
 tail -f /root/apps/cliproxyapi-plus/logs/main.log
+```
+
+systemd 日志：
+
+```bash
+journalctl -u cliproxyapi-plus -f
 ```
 
 数据：
@@ -143,12 +280,14 @@ Go build
 ## 重要文件
 
 ```text
+PORT
 patches/cliproxyapi/0001-cpa-plus-integration.patch
 cpa-plus-core/prepare-source.sh
 cpa-plus-web/patch-plus-web-integrated.py
 scripts/build-linux-binary.sh
 scripts/install-linux.sh
 scripts/update-linux.sh
+scripts/install-systemd.sh
 ```
 
 ## 隐私安全
