@@ -287,12 +287,12 @@ describe('buildApiKeyDisplayMap', () => {
     const apiKeyHash = sha256Hex(apiKey);
     const map = buildApiKeyDisplayMap(
       [apiKey],
-      [{ apiKeyHash, alias: 'sk-proj-secret-value-123456', updatedAtMs: 1 }]
+      [{ apiKeyHash, alias: 'sk-fake12', updatedAtMs: 1 }]
     );
 
     expect(map.get(apiKeyHash)?.label).toMatch(/^sk/);
     expect(map.get(apiKeyHash)?.label).toContain('**');
-    expect(map.get(apiKeyHash)?.label).not.toContain('secret-value');
+    expect(map.get(apiKeyHash)?.label).not.toContain('fake12');
   });
 });
 
