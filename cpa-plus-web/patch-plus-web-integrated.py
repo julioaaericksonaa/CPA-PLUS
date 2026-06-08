@@ -50,6 +50,24 @@ def usage() -> int:
     return 0
 
 
+
+def patch_dashboard_display(root: Path) -> None:
+    dashboard = root / "src" / "features" / "dashboard" / "DashboardPage.tsx"
+    if dashboard.exists():
+        text = dashboard.read_text()
+        text = text.replace(
+            "          cpaBase={managerCpaBase || apiBase || ''}",
+            "          cpaBase={(managerCpaBase || apiBase || '') === 'integrated' ? '集成模式' : (managerCpaBase || apiBase || '')}",
+        )
+        dashboard.write_text(text)
+
+    for rel in ["src/i18n/locales/zh-CN.json", "src/i18n/locales/zh-TW.json"]:
+        locale = root / rel
+        if locale.exists():
+            text = locale.read_text()
+            text = text.replace('"cpa_base": "CPA Base"', '"cpa_base": "CPA 模式"')
+            locale.write_text(text)
+
 def main(argv: list[str]) -> int:
     if len(argv) != 2 or argv[1] in {"-h", "--help"}:
         return usage()
@@ -70,6 +88,7 @@ def main(argv: list[str]) -> int:
             print("old standalone paths remain: " + ", ".join(forbidden), file=sys.stderr)
         return 1
     usage_service.write_text(text)
+    patch_dashboard_display(root)
     print(f"patched {usage_service}")
     return 0
 
