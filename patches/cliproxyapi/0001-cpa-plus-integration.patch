@@ -1919,7 +1919,7 @@ index 5f0a03fb..4f6f5f40 100644
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 diff --git a/internal/api/server.go b/internal/api/server.go
-index a148dd87..ef0b3eee 100644
+index a148dd87..6e0baa1e 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -2011,14 +2011,19 @@ index a148dd87..ef0b3eee 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -593,6 +636,14 @@ func (s *Server) registerManagementRoutes() {
+@@ -593,6 +636,19 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
++	if s.cfg != nil && s.cfg.PlusManager.Enabled && (s.plusManagerConfig == nil || s.plusCodexInspection == nil) {
++		s.initPlusManagerServices()
++	}
 +	plusOptions := plushttpapi.Options{
-+		Enabled:   s.cfg != nil && s.cfg.PlusManager.Enabled,
-+		Store:     s.openPlusStore(),
-+		Collector: s.plusCollector,
++		Enabled:         s.cfg != nil && s.cfg.PlusManager.Enabled,
++		Store:           s.openPlusStore(),
++		Collector:       s.plusCollector,
++		ManagerConfig:   s.plusManagerConfig,
++		CodexInspection: s.plusCodexInspection,
 +	}
 +	plushttpapi.RegisterRoutes(mgmt.Group("/plus"), plusOptions)
 +	plushttpapi.RegisterModelPriceRoutes(mgmt, plusOptions)
@@ -2026,7 +2031,7 @@ index a148dd87..ef0b3eee 100644
  	{
  		mgmt.GET("/config", s.mgmt.GetConfig)
  		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
-@@ -777,6 +828,111 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -777,6 +833,111 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -2138,7 +2143,7 @@ index a148dd87..ef0b3eee 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -842,6 +998,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -842,6 +1003,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -2150,7 +2155,7 @@ index a148dd87..ef0b3eee 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1408,6 +1569,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1408,6 +1574,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -2165,7 +2170,7 @@ index a148dd87..ef0b3eee 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1518,6 +1687,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1518,6 +1692,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -2174,7 +2179,7 @@ index a148dd87..ef0b3eee 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1549,10 +1720,14 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1549,10 +1725,14 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
