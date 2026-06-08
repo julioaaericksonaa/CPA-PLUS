@@ -1,139 +1,159 @@
-# CPA-PLUS Auto Branch
+# CPA-PLUS Linux Binary Branch
 
-这个 `auto` 分支采用 **CLIProxyAPI-Pro 风格的 patch/overlay 维护方式**：
+`linux` 分支是 CPA-PLUS 的 **Linux 二进制维护分支**。
 
-- 不在分支里保存完整 CLIProxyAPI 源码。
-- 不在分支里保存完整 CPA-Manager-Plus 前端源码。
-- 只保存 CPA-PLUS 自己的补丁、前端适配脚本、构建脚本和部署文件。
-- 构建时自动拉取两个上游，应用补丁，生成完整可运行源码，再构建 Docker 镜像。
+它不维护完整上游源码，也不以 Docker 为主；它维护 patch/overlay 构建流，用于从两个上游项目自动生成并编译 Linux 二进制。
 
-最终运行形态仍然是：
+## 分支定位
 
 ```text
-单 Docker
-单端口 8317
-完整 Plus 面板：http://host:8317/management.html
-Plus API：/v0/management/plus/*
+main  = Docker 项目分支，适合容器部署和源码构建
+linux = Linux 二进制项目分支，适合直接运行二进制
 ```
 
-## 目录说明
+本分支目标：
+
+- 生成单个 Linux 二进制：`dist/CLIProxyAPI-linux-amd64`
+- 直接运行，不依赖 Docker
+- 默认独立安装到：`/root/apps/cliproxyapi-plus`
+- 默认端口：`8318`
+- 面板入口：`http://host:8318/management.html`
+
+## 构建二进制
+
+```bash
+git clone -b linux https://github.com/julioaaericksonaa/CPA-PLUS.git CPA-PLUS-linux
+cd CPA-PLUS-linux
+./scripts/build-linux-binary.sh --skip-tests
+```
+
+生成文件：
 
 ```text
-patches/cliproxyapi/0001-cpa-plus-integration.patch
-  CPA-PLUS 后端、Dockerfile、配置、README、Plus API、SQLite store、collector 等核心补丁。
-
-cpa-plus-web/patch-plus-web-integrated.py
-  将上游 CPA-Manager-Plus 前端改成单端口 integrated API 路径。
-
-cpa-plus-core/prepare-source.sh
-  拉取两个上游并生成完整 CPA-PLUS 源码。
-
-cpa-plus-core/build-docker.sh
-  生成源码并构建 Docker 镜像。
-
-scripts/install-auto.sh
-  首次安装：构建镜像、生成 config.yaml、启动 compose。
-
-scripts/update-auto.sh
-  后续更新：重新拉取上游、应用补丁、构建镜像、重启容器。
-
-compose.auto.yml
-  auto 分支运行用 Docker Compose 文件。
+dist/CLIProxyAPI-linux-amd64
 ```
 
-## 首次安装
-
-```bash
-git clone -b auto https://github.com/julioaaericksonaa/CPA-PLUS.git CPA-PLUS-auto
-cd CPA-PLUS-auto
-./scripts/install-auto.sh
-```
-
-脚本会：
-
-1. 拉取 `router-for-me/CLIProxyAPI`。
-2. 拉取 `seakee/CPA-Manager-Plus`。
-3. 应用 CPA-PLUS core patch。
-4. 同步 Plus 前端到 `web/manager-plus`。
-5. 自动改写前端 API 路径为 `/v0/management/plus/*`。
-6. 构建本地镜像 `cpa-plus:auto`。
-7. 如果没有 `config.yaml`，自动从生成的 `config.example.yaml` 复制一份。
-8. 使用 `compose.auto.yml` 启动容器。
-
-首次启动后请修改：
-
-```yaml
-remote-management:
-  allow-remote: true
-  secret-key: "换成你自己的强密码"
-```
-
-然后重启：
-
-```bash
-docker compose -f compose.auto.yml restart cpa-plus
-```
-
-访问：
-
-```text
-http://host:8317/management.html
-```
-
-## 后续更新
-
-同步两个上游并重建：
-
-```bash
-./scripts/update-auto.sh
-```
-
-指定上游版本：
-
-```bash
-./scripts/update-auto.sh --cli-ref v7.1.54 --plus-ref main
-```
-
-只准备源码，不构建 Docker：
-
-```bash
-./cpa-plus-core/prepare-source.sh --skip-tests
-```
-
-生成后的完整源码位置：
+完整生成源码位于：
 
 ```text
 .build/out/CLIProxyAPI
 ```
 
-如果想手动检查生成结果：
+## 安装到本机
+
+默认安装到 `/root/apps/cliproxyapi-plus`，端口 `8318`：
 
 ```bash
-cd .build/out/CLIProxyAPI
-git status --short
-go test ./internal/config ./internal/managementasset ./internal/plusmanager/... ./internal/api ./internal/safemode -count=1
-docker build -t cpa-plus:auto .
+./scripts/install-linux.sh --skip-tests
 ```
 
-## 更新 CPA-PLUS 自身补丁
+安装后编辑：
 
-如果你在 `main` 完整源码分支继续开发了 CPA-PLUS 功能，可以回到本分支重新生成 core patch：
+```text
+/root/apps/cliproxyapi-plus/config.yaml
+```
+
+至少设置：
+
+```yaml
+remote-management:
+  secret-key: "换成你自己的强密码"
+```
+
+启动：
 
 ```bash
-./scripts/regenerate-core-patch.sh /root/code/cpa-plus-merge-study/CLIProxyAPI cli-upstream/main
+/root/apps/cliproxyapi-plus/start-detached.sh
 ```
 
-然后验证：
+访问：
+
+```text
+http://host:8318/management.html
+```
+
+## 更新二进制项目
 
 ```bash
-./cpa-plus-core/prepare-source.sh --skip-tests
+./scripts/update-linux.sh --skip-tests
 ```
 
-确认没问题后提交 `auto` 分支。
+指定上游版本：
+
+```bash
+./scripts/update-linux.sh --cli-ref v7.1.54 --plus-ref main --skip-tests
+```
+
+自定义安装目录和端口：
+
+```bash
+CPA_PLUS_APP_DIR=/root/apps/cliproxyapi-plus \
+CPA_PLUS_PORT=8318 \
+./scripts/install-linux.sh --skip-tests
+```
+
+## 运行维护
+
+启动：
+
+```bash
+/root/apps/cliproxyapi-plus/start-detached.sh
+```
+
+停止：
+
+```bash
+/root/apps/cliproxyapi-plus/stop.sh
+```
+
+重启：
+
+```bash
+/root/apps/cliproxyapi-plus/restart.sh
+```
+
+日志：
+
+```bash
+tail -f /root/apps/cliproxyapi-plus/logs/main.log
+```
+
+数据：
+
+```text
+/root/apps/cliproxyapi-plus/data/usage.sqlite
+```
+
+## 构建流程
+
+```text
+router-for-me/CLIProxyAPI
+  -> cpa-plus-core/prepare-source.sh
+  -> patches/cliproxyapi/*.patch
+
+seakee/CPA-Manager-Plus apps/web
+  -> cpa-plus-web/patch-plus-web-integrated.py
+  -> npm build
+  -> embedded management.html
+
+Go build
+  -> dist/CLIProxyAPI-linux-amd64
+```
+
+## 重要文件
+
+```text
+patches/cliproxyapi/0001-cpa-plus-integration.patch
+cpa-plus-core/prepare-source.sh
+cpa-plus-web/patch-plus-web-integrated.py
+scripts/build-linux-binary.sh
+scripts/install-linux.sh
+scripts/update-linux.sh
+```
 
 ## 隐私安全
 
-不要提交这些内容：
+不要提交：
 
 ```text
 config.yaml
@@ -142,6 +162,7 @@ auths/  # 除 auths/.gitkeep
 data/
 logs/
 .build/
+dist/
 *.sqlite
 *.db
 *.key
@@ -151,23 +172,9 @@ logs/
 .gemini/
 ```
 
-提交前检查：
+## 来源
 
-```bash
-git status --short
-git diff --cached --name-only
-```
+CPA-PLUS 基于以下项目整合维护：
 
-## 和 main 分支的区别
-
-```text
-main 分支：完整源码整合版，适合直接开发和调试。
-auto 分支：patch/overlay 自动构建版，适合高频同步上游和自动发布。
-```
-
-建议维护方式：
-
-1. 平时部署/更新用 `auto` 分支。
-2. 需要开发新功能时在 `main` 分支改。
-3. main 验证通过后，用 `scripts/regenerate-core-patch.sh` 刷新 auto 分支补丁。
-4. auto 分支跑 `prepare-source.sh` / `build-docker.sh` 验证。
+- CLIProxyAPI：https://github.com/router-for-me/CLIProxyAPI
+- CPA-Manager-Plus：https://github.com/seakee/CPA-Manager-Plus
