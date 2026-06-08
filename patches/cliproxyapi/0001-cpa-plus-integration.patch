@@ -1919,7 +1919,7 @@ index 5f0a03fb..4f6f5f40 100644
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 diff --git a/internal/api/server.go b/internal/api/server.go
-index a148dd87..6e0baa1e 100644
+index a148dd87..bc51f822 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -1946,7 +1946,7 @@ index a148dd87..6e0baa1e 100644
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
  	sdkaccess "github.com/router-for-me/CLIProxyAPI/v7/sdk/access"
-@@ -207,6 +215,24 @@ type Server struct {
+@@ -207,6 +215,25 @@ type Server struct {
  	// pluginHost owns dynamic plugin Management API route dispatch.
  	pluginHost *pluginhost.Host
  
@@ -1964,6 +1964,7 @@ index a148dd87..6e0baa1e 100644
 +
 +	// plusCodexWorkerCancel stops the scheduled Codex inspection worker.
 +	plusCodexWorkerCancel context.CancelFunc
++	plusCodexWorkerDone   <-chan struct{}
 +
 +	// internalManagementPassword is a runtime-only localhost key for integrated Plus background jobs.
 +	internalManagementPassword string
@@ -1971,7 +1972,7 @@ index a148dd87..6e0baa1e 100644
  	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
  	managementRoutesRegistered atomic.Bool
  	// managementRoutesEnabled controls whether management endpoints serve real handlers.
-@@ -315,6 +341,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -315,6 +342,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	if optionState.localPassword != "" {
  		s.mgmt.SetLocalPassword(optionState.localPassword)
  	}
@@ -1986,7 +1987,7 @@ index a148dd87..6e0baa1e 100644
  	logDir := logging.ResolveLogDirectory(cfg)
  	s.mgmt.SetLogDirectory(logDir)
  	if optionState.postAuthHook != nil {
-@@ -331,6 +365,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -331,6 +366,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  
  	// Setup routes
  	s.setupRoutes()
@@ -2001,7 +2002,7 @@ index a148dd87..6e0baa1e 100644
  
  	// Register Amp module using V2 interface with Context
  	s.ampModule = ampmodule.NewLegacy(accessManager, AuthMiddleware(accessManager))
-@@ -353,7 +395,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -353,7 +396,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	// or when a local management password is provided (e.g. TUI mode).
  	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
  	s.managementRoutesEnabled.Store(hasManagementSecret)
@@ -2011,7 +2012,7 @@ index a148dd87..6e0baa1e 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -593,6 +636,19 @@ func (s *Server) registerManagementRoutes() {
+@@ -593,6 +637,19 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -2031,7 +2032,15 @@ index a148dd87..6e0baa1e 100644
  	{
  		mgmt.GET("/config", s.mgmt.GetConfig)
  		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
-@@ -777,6 +833,111 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -750,6 +807,7 @@ func (s *Server) registerManagementRoutes() {
+ 		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
+ 		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
+ 	}
++	s.startPlusCodexInspectionWorker()
+ }
+ 
+ func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
+@@ -777,6 +835,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -2121,7 +2130,7 @@ index a148dd87..6e0baa1e 100644
 +	}
 +	ctx, cancel := context.WithCancel(context.Background())
 +	s.plusCodexWorkerCancel = cancel
-+	plusworker.NewCodexInspectionWorker(s.openPlusStore(), s.plusCodexInspection).Start(ctx)
++	s.plusCodexWorkerDone = plusworker.NewCodexInspectionWorker(s.openPlusStore(), s.plusCodexInspection).Start(ctx)
 +}
 +
 +func (s *Server) stopPlusCodexInspectionWorker() {
@@ -2129,7 +2138,15 @@ index a148dd87..6e0baa1e 100644
 +		return
 +	}
 +	s.plusCodexWorkerCancel()
++	if s.plusCodexWorkerDone != nil {
++		select {
++		case <-s.plusCodexWorkerDone:
++		case <-time.After(2 * time.Second):
++			log.Debug("timed out waiting for Plus Codex inspection worker to stop")
++		}
++	}
 +	s.plusCodexWorkerCancel = nil
++	s.plusCodexWorkerDone = nil
 +}
 +
 +func generateInternalManagementPassword() string {
@@ -2143,7 +2160,7 @@ index a148dd87..6e0baa1e 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -842,6 +1003,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -842,6 +1013,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -2155,7 +2172,7 @@ index a148dd87..6e0baa1e 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1408,6 +1574,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1408,6 +1584,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -2170,7 +2187,7 @@ index a148dd87..6e0baa1e 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1518,6 +1692,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1518,6 +1702,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -2179,7 +2196,7 @@ index a148dd87..6e0baa1e 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1549,10 +1725,14 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1549,10 +1735,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -2190,6 +2207,12 @@ index a148dd87..6e0baa1e 100644
 +	} else {
 +		s.stopPlusCollector(context.Background())
 +	}
++	if cfg != nil && cfg.PlusManager.Enabled {
++		s.initPlusManagerServices()
++		s.startPlusCodexInspectionWorker()
++	} else {
++		s.stopPlusCodexInspectionWorker()
++	}
  
  	s.applyAccessConfig(oldCfg, cfg)
 -	s.cfg = cfg
@@ -2197,7 +2220,7 @@ index a148dd87..6e0baa1e 100644
  	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
  		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 diff --git a/internal/api/server_test.go b/internal/api/server_test.go
-index c01dff2b..97759e49 100644
+index c01dff2b..7fe6b4cb 100644
 --- a/internal/api/server_test.go
 +++ b/internal/api/server_test.go
 @@ -1,6 +1,7 @@
@@ -2208,10 +2231,18 @@ index c01dff2b..97759e49 100644
  	"encoding/json"
  	"net/http"
  	"net/http/httptest"
-@@ -49,6 +50,47 @@ func newTestServer(t *testing.T) *Server {
- 	return NewServer(cfg, authManager, accessManager, configPath)
- }
+@@ -45,6 +46,51 @@ func newTestServer(t *testing.T) *Server {
+ 	authManager := auth.NewManager(nil, nil, nil)
+ 	accessManager := sdkaccess.NewManager()
  
++	configPath := filepath.Join(tmpDir, "config.yaml")
++	server := NewServer(cfg, authManager, accessManager, configPath)
++	t.Cleanup(func() {
++		_ = server.Stop(context.Background())
++	})
++	return server
++}
++
 +func newTestServerWithPlusManager(t *testing.T, enabled bool) *Server {
 +	t.Helper()
 +	return newTestServerWithPlusManagerDBPath(t, enabled, "")
@@ -2249,14 +2280,10 @@ index c01dff2b..97759e49 100644
 +	authManager := auth.NewManager(nil, nil, nil)
 +	accessManager := sdkaccess.NewManager()
 +
-+	configPath := filepath.Join(tmpDir, "config.yaml")
-+	return NewServer(cfg, authManager, accessManager, configPath)
-+}
-+
- func TestHealthz(t *testing.T) {
- 	server := newTestServer(t)
- 
-@@ -86,6 +128,84 @@ func TestHealthz(t *testing.T) {
+ 	configPath := filepath.Join(tmpDir, "config.yaml")
+ 	return NewServer(cfg, authManager, accessManager, configPath)
+ }
+@@ -86,6 +132,96 @@ func TestHealthz(t *testing.T) {
  	})
  }
  
@@ -2279,6 +2306,18 @@ index c01dff2b..97759e49 100644
 +	enabledServer.engine.ServeHTTP(enabledRR, enabledReq)
 +	if enabledRR.Code != http.StatusOK {
 +		t.Fatalf("enabled plus status = %d, want %d body=%s", enabledRR.Code, http.StatusOK, enabledRR.Body.String())
++	}
++}
++
++func TestPlusCodexInspectionWorkerStartsWhenPlusManagerEnabled(t *testing.T) {
++	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
++
++	server := newTestServerWithPlusManagerDBPath(t, true, filepath.Join(t.TempDir(), "usage.sqlite"))
++	if server.plusCodexInspection == nil {
++		t.Fatal("plusCodexInspection service was not initialized")
++	}
++	if server.plusCodexWorkerCancel == nil {
++		t.Fatal("plus Codex inspection worker was not started")
 +	}
 +}
 +
@@ -8000,10 +8039,10 @@ index 00000000..bc15869e
 +}
 diff --git a/internal/plusmanager/store/store.go b/internal/plusmanager/store/store.go
 new file mode 100644
-index 00000000..71525137
+index 00000000..ce0e7972
 --- /dev/null
 +++ b/internal/plusmanager/store/store.go
-@@ -0,0 +1,1333 @@
+@@ -0,0 +1,1338 @@
 +package store
 +
 +import (
@@ -8055,6 +8094,11 @@ index 00000000..71525137
 +	}
 +	db, err := sql.Open("sqlite", dbPath)
 +	if err != nil {
++		return nil, err
++	}
++	db.SetMaxOpenConns(1)
++	if _, err := db.Exec(`PRAGMA busy_timeout = 5000`); err != nil {
++		db.Close()
 +		return nil, err
 +	}
 +	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS model_prices (
@@ -9539,10 +9583,10 @@ index 00000000..5687211a
 +}
 diff --git a/internal/plusmanager/worker/codex_inspection_worker.go b/internal/plusmanager/worker/codex_inspection_worker.go
 new file mode 100644
-index 00000000..fb4d16a6
+index 00000000..37fb6943
 --- /dev/null
 +++ b/internal/plusmanager/worker/codex_inspection_worker.go
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,97 @@
 +package worker
 +
 +import (
@@ -9564,17 +9608,28 @@ index 00000000..fb4d16a6
 +	return &CodexInspectionWorker{store: store, service: service}
 +}
 +
-+func (w *CodexInspectionWorker) Start(ctx context.Context) {
++func (w *CodexInspectionWorker) Start(ctx context.Context) <-chan struct{} {
++	done := make(chan struct{})
 +	if w == nil || w.service == nil {
-+		return
++		close(done)
++		return done
 +	}
-+	go w.run(ctx)
++	go func() {
++		defer close(done)
++		w.run(ctx)
++	}()
++	return done
 +}
 +
 +func (w *CodexInspectionWorker) run(ctx context.Context) {
 +	ticker := time.NewTicker(30 * time.Second)
 +	defer ticker.Stop()
 +
++	select {
++	case <-ctx.Done():
++		return
++	default:
++	}
 +	w.tick(ctx)
 +	for {
 +		select {
