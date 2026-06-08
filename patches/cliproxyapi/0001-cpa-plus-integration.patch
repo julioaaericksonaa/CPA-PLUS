@@ -6548,10 +6548,10 @@ index 00000000..25762c7c
 +}
 diff --git a/internal/plusmanager/httpapi/router_test.go b/internal/plusmanager/httpapi/router_test.go
 new file mode 100644
-index 00000000..6be4ae6e
+index 00000000..05ae4d6e
 --- /dev/null
 +++ b/internal/plusmanager/httpapi/router_test.go
-@@ -0,0 +1,619 @@
+@@ -0,0 +1,643 @@
 +package httpapi
 +
 +import (
@@ -7087,6 +7087,30 @@ index 00000000..6be4ae6e
 +	}
 +	if analyticsResp.GeneratedAtMS == 0 || analyticsResp.Granularity == "" || analyticsResp.Summary == nil || analyticsResp.Summary.TotalCalls != 2 || analyticsResp.Events == nil || len(analyticsResp.Events.Items) != 2 || len(analyticsResp.RecentFailures) != 1 {
 +		t.Fatalf("analytics response = %#v", analyticsResp)
++	}
++}
++
++func TestCodexInspectionRunsEmptyHistoryReturnsArray(t *testing.T) {
++	gin.SetMode(gin.TestMode)
++	s, err := store.Open(filepath.Join(t.TempDir(), "usage.sqlite"))
++	if err != nil {
++		t.Fatalf("store.Open() error = %v", err)
++	}
++	defer s.Close()
++	managerSvc := managerconfig.New(nil, s, "http://127.0.0.1:8317", "internal-management-key")
++	inspectionSvc := codexinspection.New(s, managerSvc)
++
++	r := gin.New()
++	RegisterCodexInspectionRoutes(r.Group("/v0/management"), Options{Enabled: true, CodexInspection: inspectionSvc})
++
++	req := httptest.NewRequest(http.MethodGet, "/v0/management/codex-inspection/runs?limit=30", nil)
++	w := httptest.NewRecorder()
++	r.ServeHTTP(w, req)
++	if w.Code != http.StatusOK {
++		t.Fatalf("status code = %d, want 200; body=%s", w.Code, w.Body.String())
++	}
++	if !strings.Contains(w.Body.String(), `"items":[]`) {
++		t.Fatalf("empty history should be an array, got: %s", w.Body.String())
 +	}
 +}
 +
@@ -7976,7 +8000,7 @@ index 00000000..bc15869e
 +}
 diff --git a/internal/plusmanager/store/store.go b/internal/plusmanager/store/store.go
 new file mode 100644
-index 00000000..81b4df9d
+index 00000000..71525137
 --- /dev/null
 +++ b/internal/plusmanager/store/store.go
 @@ -0,0 +1,1333 @@
@@ -9095,7 +9119,7 @@ index 00000000..81b4df9d
 +		return nil, err
 +	}
 +	defer rows.Close()
-+	var runs []CodexInspectionRun
++	runs := make([]CodexInspectionRun, 0)
 +	for rows.Next() {
 +		run, err := scanCodexInspectionRun(rows)
 +		if err != nil {
@@ -9146,7 +9170,7 @@ index 00000000..81b4df9d
 +		return nil, err
 +	}
 +	defer rows.Close()
-+	var results []CodexInspectionResult
++	results := make([]CodexInspectionResult, 0)
 +	for rows.Next() {
 +		result, err := scanCodexInspectionResult(rows)
 +		if err != nil {
@@ -9164,7 +9188,7 @@ index 00000000..81b4df9d
 +		return nil, err
 +	}
 +	defer rows.Close()
-+	var logs []CodexInspectionLog
++	logs := make([]CodexInspectionLog, 0)
 +	for rows.Next() {
 +		entry, err := scanCodexInspectionLog(rows)
 +		if err != nil {
