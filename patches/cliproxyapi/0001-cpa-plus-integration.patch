@@ -1,3 +1,1013 @@
+diff --git a/.github/workflows/agents-md-guard.yml b/.github/workflows/agents-md-guard.yml
+deleted file mode 100644
+index c9ac0cb4..00000000
+--- a/.github/workflows/agents-md-guard.yml
++++ /dev/null
+@@ -1,81 +0,0 @@
+-name: agents-md-guard
+-
+-on:
+-  pull_request_target:
+-    types:
+-      - opened
+-      - synchronize
+-      - reopened
+-
+-permissions:
+-  contents: read
+-  issues: write
+-  pull-requests: write
+-
+-jobs:
+-  close-when-agents-md-changed:
+-    runs-on: ubuntu-latest
+-    steps:
+-      - name: Detect AGENTS.md changes and close PR
+-        uses: actions/github-script@v7
+-        with:
+-          script: |
+-            const prNumber = context.payload.pull_request.number;
+-            const { owner, repo } = context.repo;
+-
+-            const files = await github.paginate(github.rest.pulls.listFiles, {
+-              owner,
+-              repo,
+-              pull_number: prNumber,
+-              per_page: 100,
+-            });
+-
+-            const touchesAgentsMd = (path) =>
+-              typeof path === "string" &&
+-              (path === "AGENTS.md" || path.endsWith("/AGENTS.md"));
+-
+-            const touched = files.filter(
+-              (f) => touchesAgentsMd(f.filename) || touchesAgentsMd(f.previous_filename),
+-            );
+-
+-            if (touched.length === 0) {
+-              core.info("No AGENTS.md changes detected.");
+-              return;
+-            }
+-
+-            const changedList = touched
+-              .map((f) =>
+-                f.previous_filename && f.previous_filename !== f.filename
+-                  ? `- ${f.previous_filename} -> ${f.filename}`
+-                  : `- ${f.filename}`,
+-              )
+-              .join("\n");
+-
+-            const body = [
+-              "This repository does not allow modifying `AGENTS.md` in pull requests.",
+-              "",
+-              "Detected changes:",
+-              changedList,
+-              "",
+-              "Please revert these changes and open a new PR without touching `AGENTS.md`.",
+-            ].join("\n");
+-
+-            try {
+-              await github.rest.issues.createComment({
+-                owner,
+-                repo,
+-                issue_number: prNumber,
+-                body,
+-              });
+-            } catch (error) {
+-              core.warning(`Failed to comment on PR #${prNumber}: ${error.message}`);
+-            }
+-
+-            await github.rest.pulls.update({
+-              owner,
+-              repo,
+-              pull_number: prNumber,
+-              state: "closed",
+-            });
+-
+-            core.setFailed("PR modifies AGENTS.md");
+diff --git a/.github/workflows/auto-retarget-main-pr-to-dev.yml b/.github/workflows/auto-retarget-main-pr-to-dev.yml
+deleted file mode 100644
+index 3732a723..00000000
+--- a/.github/workflows/auto-retarget-main-pr-to-dev.yml
++++ /dev/null
+@@ -1,73 +0,0 @@
+-name: auto-retarget-main-pr-to-dev
+-
+-on:
+-  pull_request_target:
+-    types:
+-      - opened
+-      - reopened
+-      - edited
+-    branches:
+-      - main
+-
+-permissions:
+-  contents: read
+-  issues: write
+-  pull-requests: write
+-
+-jobs:
+-  retarget:
+-    if: github.actor != 'github-actions[bot]'
+-    runs-on: ubuntu-latest
+-    steps:
+-      - name: Retarget PR base to dev
+-        uses: actions/github-script@v7
+-        with:
+-          script: |
+-            const pr = context.payload.pull_request;
+-            const prNumber = pr.number;
+-            const { owner, repo } = context.repo;
+-
+-            const baseRef = pr.base?.ref;
+-            const headRef = pr.head?.ref;
+-            const desiredBase = "dev";
+-
+-            if (baseRef !== "main") {
+-              core.info(`PR #${prNumber} base is ${baseRef}; nothing to do.`);
+-              return;
+-            }
+-
+-            if (headRef === desiredBase) {
+-              core.info(`PR #${prNumber} is ${desiredBase} -> main; skipping retarget.`);
+-              return;
+-            }
+-
+-            core.info(`Retargeting PR #${prNumber} base from ${baseRef} to ${desiredBase}.`);
+-
+-            try {
+-              await github.rest.pulls.update({
+-                owner,
+-                repo,
+-                pull_number: prNumber,
+-                base: desiredBase,
+-              });
+-            } catch (error) {
+-              core.setFailed(`Failed to retarget PR #${prNumber} to ${desiredBase}: ${error.message}`);
+-              return;
+-            }
+-
+-            const body = [
+-              `This pull request targeted \`${baseRef}\`.`,
+-              "",
+-              `The base branch has been automatically changed to \`${desiredBase}\`.`,
+-            ].join("\n");
+-
+-            try {
+-              await github.rest.issues.createComment({
+-                owner,
+-                repo,
+-                issue_number: prNumber,
+-                body,
+-              });
+-            } catch (error) {
+-              core.warning(`Failed to comment on PR #${prNumber}: ${error.message}`);
+-            }
+diff --git a/.github/workflows/docker-image.yml b/.github/workflows/docker-image.yml
+deleted file mode 100644
+index 443462df..00000000
+--- a/.github/workflows/docker-image.yml
++++ /dev/null
+@@ -1,147 +0,0 @@
+-name: docker-image
+-
+-on:
+-  push:
+-    tags:
+-      - v*
+-
+-env:
+-  APP_NAME: CLIProxyAPI
+-  DOCKERHUB_REPO: eceasy/cli-proxy-api
+-
+-jobs:
+-  docker_amd64:
+-    runs-on: ubuntu-latest
+-    steps:
+-      - name: Checkout
+-        uses: actions/checkout@v4
+-      - name: Refresh models catalog
+-        run: |
+-          git fetch --depth 1 https://github.com/router-for-me/models.git main
+-          git show FETCH_HEAD:models.json > internal/registry/models/models.json
+-      - name: Set up Docker Buildx
+-        uses: docker/setup-buildx-action@v3
+-      - name: Login to DockerHub
+-        uses: docker/login-action@v3
+-        with:
+-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+-      - name: Generate Build Metadata
+-        run: |
+-          echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+-          echo COMMIT=`git rev-parse --short HEAD` >> $GITHUB_ENV
+-          echo BUILD_DATE=`date -u +%Y-%m-%dT%H:%M:%SZ` >> $GITHUB_ENV
+-      - name: Build and push (amd64)
+-        uses: docker/build-push-action@v6
+-        with:
+-          context: .
+-          platforms: linux/amd64
+-          push: true
+-          build-args: |
+-            VERSION=${{ env.VERSION }}
+-            COMMIT=${{ env.COMMIT }}
+-            BUILD_DATE=${{ env.BUILD_DATE }}
+-          tags: |
+-            ${{ env.DOCKERHUB_REPO }}:latest-amd64
+-            ${{ env.DOCKERHUB_REPO }}:${{ env.VERSION }}-amd64
+-
+-  docker_arm64:
+-    runs-on: ubuntu-24.04-arm
+-    steps:
+-      - name: Checkout
+-        uses: actions/checkout@v4
+-      - name: Refresh models catalog
+-        run: |
+-          git fetch --depth 1 https://github.com/router-for-me/models.git main
+-          git show FETCH_HEAD:models.json > internal/registry/models/models.json
+-      - name: Set up Docker Buildx
+-        uses: docker/setup-buildx-action@v3
+-      - name: Login to DockerHub
+-        uses: docker/login-action@v3
+-        with:
+-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+-      - name: Generate Build Metadata
+-        run: |
+-          echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+-          echo COMMIT=`git rev-parse --short HEAD` >> $GITHUB_ENV
+-          echo BUILD_DATE=`date -u +%Y-%m-%dT%H:%M:%SZ` >> $GITHUB_ENV
+-      - name: Build and push (arm64)
+-        uses: docker/build-push-action@v6
+-        with:
+-          context: .
+-          platforms: linux/arm64
+-          push: true
+-          build-args: |
+-            VERSION=${{ env.VERSION }}
+-            COMMIT=${{ env.COMMIT }}
+-            BUILD_DATE=${{ env.BUILD_DATE }}
+-          tags: |
+-            ${{ env.DOCKERHUB_REPO }}:latest-arm64
+-            ${{ env.DOCKERHUB_REPO }}:${{ env.VERSION }}-arm64
+-
+-  docker_manifest:
+-    runs-on: ubuntu-latest
+-    needs:
+-      - docker_amd64
+-      - docker_arm64
+-    steps:
+-      - name: Checkout
+-        uses: actions/checkout@v4
+-      - name: Set up Docker Buildx
+-        uses: docker/setup-buildx-action@v3
+-      - name: Login to DockerHub
+-        uses: docker/login-action@v3
+-        with:
+-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+-      - name: Generate Build Metadata
+-        run: |
+-          echo "VERSION=${GITHUB_REF_NAME}" >> $GITHUB_ENV
+-          echo COMMIT=`git rev-parse --short HEAD` >> $GITHUB_ENV
+-          echo BUILD_DATE=`date -u +%Y-%m-%dT%H:%M:%SZ` >> $GITHUB_ENV
+-      - name: Create and push multi-arch manifests
+-        run: |
+-          docker buildx imagetools create \
+-            --tag "${DOCKERHUB_REPO}:latest" \
+-            "${DOCKERHUB_REPO}:latest-amd64" \
+-            "${DOCKERHUB_REPO}:latest-arm64"
+-          docker buildx imagetools create \
+-            --tag "${DOCKERHUB_REPO}:${VERSION}" \
+-            "${DOCKERHUB_REPO}:${VERSION}-amd64" \
+-            "${DOCKERHUB_REPO}:${VERSION}-arm64"
+-      - name: Cleanup temporary tags
+-        continue-on-error: true
+-        env:
+-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          namespace="${DOCKERHUB_REPO%%/*}"
+-          repo_name="${DOCKERHUB_REPO#*/}"
+-
+-          token="$(
+-            curl -fsSL \
+-              -H 'Content-Type: application/json' \
+-              -d "{\"username\":\"${DOCKERHUB_USERNAME}\",\"password\":\"${DOCKERHUB_TOKEN}\"}" \
+-              'https://hub.docker.com/v2/users/login/' \
+-              | python3 -c 'import json,sys; print(json.load(sys.stdin)["token"])'
+-          )"
+-
+-          delete_tag() {
+-            local tag="$1"
+-            local url="https://hub.docker.com/v2/repositories/${namespace}/${repo_name}/tags/${tag}/"
+-            local http_code
+-            http_code="$(curl -sS -o /dev/null -w "%{http_code}" -X DELETE -H "Authorization: JWT ${token}" "${url}" || true)"
+-            if [ "${http_code}" = "204" ] || [ "${http_code}" = "404" ]; then
+-              echo "Docker Hub tag removed (or missing): ${DOCKERHUB_REPO}:${tag} (HTTP ${http_code})"
+-              return 0
+-            fi
+-            echo "Docker Hub tag delete failed: ${DOCKERHUB_REPO}:${tag} (HTTP ${http_code})"
+-            return 0
+-          }
+-
+-          delete_tag "latest-amd64"
+-          delete_tag "latest-arm64"
+-          delete_tag "${VERSION}-amd64"
+-          delete_tag "${VERSION}-arm64"
+diff --git a/.github/workflows/pr-path-guard.yml b/.github/workflows/pr-path-guard.yml
+deleted file mode 100644
+index 4fe3d938..00000000
+--- a/.github/workflows/pr-path-guard.yml
++++ /dev/null
+@@ -1,28 +0,0 @@
+-name: translator-path-guard
+-
+-on:
+-  pull_request:
+-    types:
+-      - opened
+-      - synchronize
+-      - reopened
+-
+-jobs:
+-  ensure-no-translator-changes:
+-    runs-on: ubuntu-latest
+-    steps:
+-      - uses: actions/checkout@v4
+-        with:
+-          fetch-depth: 0
+-      - name: Detect internal/translator changes
+-        id: changed-files
+-        uses: tj-actions/changed-files@v45
+-        with:
+-          files: |
+-            internal/translator/**
+-      - name: Fail when restricted paths change
+-        if: steps.changed-files.outputs.any_changed == 'true'
+-        run: |
+-          echo "Changes under internal/translator are not allowed in pull requests."
+-          echo "You need to create an issue for our maintenance team to make the necessary changes."
+-          exit 1
+diff --git a/.github/workflows/pr-test-build.yml b/.github/workflows/pr-test-build.yml
+deleted file mode 100644
+index 75f4c520..00000000
+--- a/.github/workflows/pr-test-build.yml
++++ /dev/null
+@@ -1,27 +0,0 @@
+-name: pr-test-build
+-
+-on:
+-  pull_request:
+-
+-permissions:
+-  contents: read
+-
+-jobs:
+-  build:
+-    runs-on: ubuntu-latest
+-    steps:
+-      - name: Checkout
+-        uses: actions/checkout@v4
+-      - name: Refresh models catalog
+-        run: |
+-          git fetch --depth 1 https://github.com/router-for-me/models.git main
+-          git show FETCH_HEAD:models.json > internal/registry/models/models.json
+-      - name: Set up Go
+-        uses: actions/setup-go@v5
+-        with:
+-          go-version-file: go.mod
+-          cache: true
+-      - name: Build
+-        run: |
+-          go build -o test-output ./cmd/server
+-          rm -f test-output
+diff --git a/.github/workflows/release.yaml b/.github/workflows/release.yaml
+deleted file mode 100644
+index 6c7e6fea..00000000
+--- a/.github/workflows/release.yaml
++++ /dev/null
+@@ -1,618 +0,0 @@
+-name: release
+-
+-on:
+-  push:
+-    # run only against tags
+-    tags:
+-      - '*'
+-
+-permissions:
+-  contents: write
+-
+-env:
+-  GH_REPO: ${{ github.repository }}
+-  GO_VERSION: '1.26.4'
+-
+-jobs:
+-  prepare-release:
+-    runs-on: ubuntu-latest
+-    steps:
+-      - name: Create release
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          release_notes_file="$(mktemp)"
+-          current_notes_file="$(mktemp)"
+-          updated_notes_file="$(mktemp)"
+-          trap 'rm -f "$release_notes_file" "$current_notes_file" "$updated_notes_file"' EXIT
+-
+-          cat > "$release_notes_file" <<'EOF'
+-          <!-- cliproxyapi-linux-release-assets:start -->
+-          ## Linux release assets
+-
+-          - `CLIProxyAPI_<version>_linux_<arch>.tar.gz` is the default Linux build. It supports dynamic library plugins and is built against a GLIBC 2.17 baseline.
+-          - `CLIProxyAPI_<version>_linux_<arch>_no-plugin.tar.gz` is the portable Linux build for musl-based or older systems such as OpenWrt. It does not support dynamic library plugins.
+-
+-          <!-- cliproxyapi-linux-release-assets:end -->
+-          EOF
+-
+-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+-            gh release edit "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME"
+-          else
+-            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+-          fi
+-          gh release view "$GITHUB_REF_NAME" --json body -q .body > "$current_notes_file"
+-          {
+-            cat "$release_notes_file"
+-            printf '\n'
+-            awk '
+-              /^<!-- cliproxyapi-linux-release-assets:start -->$/ { skip = 1; next }
+-              /^<!-- cliproxyapi-linux-release-assets:end -->$/ { skip = 0; next }
+-              !skip { print }
+-            ' "$current_notes_file"
+-          } > "$updated_notes_file"
+-          gh release edit "$GITHUB_REF_NAME" --notes-file "$updated_notes_file"
+-
+-  build-hosted:
+-    name: build ${{ matrix.target }}
+-    needs: prepare-release
+-    runs-on: ${{ matrix.runner }}
+-    strategy:
+-      fail-fast: false
+-      matrix:
+-        include:
+-          - target: darwin-amd64
+-            runner: macos-15-intel
+-            goos: darwin
+-            goarch: amd64
+-            asset_arch: amd64
+-            archive_format: tar.gz
+-          - target: darwin-arm64
+-            runner: macos-15
+-            goos: darwin
+-            goarch: arm64
+-            asset_arch: aarch64
+-            archive_format: tar.gz
+-          - target: windows-amd64
+-            runner: windows-latest
+-            goos: windows
+-            goarch: amd64
+-            asset_arch: amd64
+-            archive_format: zip
+-          - target: windows-arm64
+-            runner: windows-11-arm
+-            goos: windows
+-            goarch: arm64
+-            asset_arch: aarch64
+-            archive_format: zip
+-    steps:
+-      - uses: actions/checkout@v6
+-        with:
+-          fetch-depth: 0
+-      - name: Refresh models catalog
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          git fetch --depth 1 https://github.com/router-for-me/models.git main
+-          git show FETCH_HEAD:models.json > internal/registry/models/models.json
+-      - name: Fetch tags
+-        shell: bash
+-        run: git fetch --force --tags
+-      - uses: actions/setup-go@v6
+-        with:
+-          go-version: ${{ env.GO_VERSION }}
+-          cache: true
+-      - uses: actions/cache@v4
+-        with:
+-          path: |
+-            ~/.cache/go-build
+-            ~/go/pkg/mod
+-          key: go-${{ runner.os }}-${{ runner.arch }}-${{ matrix.target }}-${{ hashFiles('go.sum') }}
+-          restore-keys: |
+-            go-${{ runner.os }}-${{ runner.arch }}-${{ matrix.target }}-
+-            go-${{ runner.os }}-${{ runner.arch }}-
+-      - name: Generate Build Metadata
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+-          echo "COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+-          echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+-      - name: Build archive
+-        shell: bash
+-        env:
+-          TARGET: ${{ matrix.target }}
+-          GOOS: ${{ matrix.goos }}
+-          GOARCH: ${{ matrix.goarch }}
+-          ASSET_ARCH: ${{ matrix.asset_arch }}
+-          ARCHIVE_FORMAT: ${{ matrix.archive_format }}
+-        run: |
+-          set -euo pipefail
+-          binary_name="cli-proxy-api"
+-          if [[ "$GOOS" == "windows" ]]; then
+-            binary_name="cli-proxy-api.exe"
+-          fi
+-
+-          archive_dir="dist/${TARGET}/archive"
+-          archive_name="CLIProxyAPI_${RELEASE_VERSION}_${GOOS}_${ASSET_ARCH}.${ARCHIVE_FORMAT}"
+-          rm -rf "dist/${TARGET}"
+-          mkdir -p "$archive_dir"
+-
+-          CGO_ENABLED=1 GOOS="$GOOS" GOARCH="$GOARCH" go build \
+-            -ldflags="-s -w -X main.Version=${RELEASE_VERSION} -X main.Commit=${COMMIT} -X main.BuildDate=${BUILD_DATE}" \
+-            -o "$archive_dir/$binary_name" ./cmd/server/
+-
+-          cp LICENSE README.md README_CN.md config.example.yaml "$archive_dir/"
+-          if [[ "$ARCHIVE_FORMAT" == "zip" ]]; then
+-            powershell -NoProfile -Command "Compress-Archive -Path '${archive_dir}/*' -DestinationPath 'dist/${archive_name}' -Force"
+-          else
+-            tar -C "$archive_dir" -czf "dist/$archive_name" "$binary_name" LICENSE README.md README_CN.md config.example.yaml
+-          fi
+-      - uses: actions/upload-artifact@v4
+-        with:
+-          name: ${{ matrix.target }}
+-          path: dist/CLIProxyAPI_*
+-          if-no-files-found: error
+-      - name: Upload release assets
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          shopt -s nullglob
+-          assets=(dist/CLIProxyAPI_*.tar.gz dist/CLIProxyAPI_*.zip)
+-          if [[ ${#assets[@]} -eq 0 ]]; then
+-            printf 'expected archive assets, found %s\n' "${#assets[@]}" >&2
+-            printf '%s\n' "${assets[@]}" >&2
+-            exit 1
+-          fi
+-          gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+-      - name: Refresh release checksums
+-        continue-on-error: true
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          tmp_dir="$(mktemp -d)"
+-          trap 'rm -rf "$tmp_dir"' EXIT
+-          gh release download "$GITHUB_REF_NAME" \
+-            --pattern 'CLIProxyAPI_*.tar.gz' \
+-            --pattern 'CLIProxyAPI_*.zip' \
+-            --dir "$tmp_dir" \
+-            --clobber
+-          (
+-            cd "$tmp_dir"
+-            shopt -s nullglob
+-            archives=(CLIProxyAPI_*.tar.gz CLIProxyAPI_*.zip)
+-            if [[ ${#archives[@]} -eq 0 ]]; then
+-              echo "No release archives found"
+-              exit 0
+-            fi
+-            if command -v sha256sum >/dev/null 2>&1; then
+-              sha256sum "${archives[@]}" | sort -k2 > checksums.txt
+-            else
+-              shasum -a 256 "${archives[@]}" | sort -k2 > checksums.txt
+-            fi
+-          )
+-          gh release upload "$GITHUB_REF_NAME" "$tmp_dir/checksums.txt" --clobber
+-
+-  build-linux-glibc:
+-    name: build linux-${{ matrix.goarch }} glibc
+-    needs: prepare-release
+-    runs-on: ${{ matrix.runner }}
+-    strategy:
+-      fail-fast: false
+-      matrix:
+-        include:
+-          - target: linux-amd64
+-            runner: ubuntu-latest
+-            goarch: amd64
+-            asset_arch: amd64
+-            manylinux_image: quay.io/pypa/manylinux2014_x86_64
+-          - target: linux-arm64
+-            runner: ubuntu-24.04-arm
+-            goarch: arm64
+-            asset_arch: aarch64
+-            manylinux_image: quay.io/pypa/manylinux2014_aarch64
+-    steps:
+-      - uses: actions/checkout@v6
+-        with:
+-          fetch-depth: 0
+-      - name: Refresh models catalog
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          git fetch --depth 1 https://github.com/router-for-me/models.git main
+-          git show FETCH_HEAD:models.json > internal/registry/models/models.json
+-      - name: Fetch tags
+-        shell: bash
+-        run: git fetch --force --tags
+-      - name: Generate Build Metadata
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+-          echo "COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+-          echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+-      - name: Build archive
+-        shell: bash
+-        env:
+-          TARGET: ${{ matrix.target }}
+-          GOARCH: ${{ matrix.goarch }}
+-          ASSET_ARCH: ${{ matrix.asset_arch }}
+-          MANYLINUX_IMAGE: ${{ matrix.manylinux_image }}
+-        run: |
+-          set -euo pipefail
+-
+-          archive_dir="dist/${TARGET}/archive"
+-          archive_name="CLIProxyAPI_${RELEASE_VERSION}_linux_${ASSET_ARCH}.tar.gz"
+-          rm -rf "dist/${TARGET}"
+-          mkdir -p "$archive_dir"
+-
+-          docker run --rm \
+-            -v "$PWD:/src" \
+-            -w /src \
+-            -e GO_VERSION \
+-            -e GOARCH \
+-            -e RELEASE_VERSION \
+-            -e COMMIT \
+-            -e BUILD_DATE \
+-            "$MANYLINUX_IMAGE" \
+-            bash -euo pipefail -c '
+-              go_archive="go${GO_VERSION}.linux-${GOARCH}.tar.gz"
+-              curl -fsSL "https://go.dev/dl/${go_archive}" -o "/tmp/${go_archive}"
+-              rm -rf /usr/local/go
+-              tar -C /usr/local -xzf "/tmp/${go_archive}"
+-              export PATH="/usr/local/go/bin:${PATH}"
+-
+-              CGO_ENABLED=1 GOOS=linux GOARCH="${GOARCH}" go build -buildvcs=false \
+-                -ldflags="-s -w -X main.Version=${RELEASE_VERSION} -X main.Commit=${COMMIT} -X main.BuildDate=${BUILD_DATE}" \
+-                -o "'"$archive_dir"'/cli-proxy-api" ./cmd/server/
+-
+-              glibc_versions="$(readelf --version-info "'"$archive_dir"'/cli-proxy-api" | sed -n "s/.*Name: GLIBC_\([0-9.]*\).*/\1/p" | sort -Vu)"
+-              if [[ -n "${glibc_versions}" ]]; then
+-                printf "GLIBC versions:\n%s\n" "${glibc_versions}"
+-                max_glibc="$(printf "%s\n" "${glibc_versions}" | sort -V | tail -n 1)"
+-                if [[ "$(printf "2.17\n%s\n" "${max_glibc}" | sort -V | tail -n 1)" != "2.17" ]]; then
+-                  printf "linux ${GOARCH} binary requires GLIBC_%s, expected GLIBC_2.17 or older\n" "${max_glibc}" >&2
+-                  exit 1
+-                fi
+-              fi
+-            '
+-
+-          cp LICENSE README.md README_CN.md config.example.yaml "$archive_dir/"
+-          tar -C "$archive_dir" -czf "dist/$archive_name" cli-proxy-api LICENSE README.md README_CN.md config.example.yaml
+-      - uses: actions/upload-artifact@v4
+-        with:
+-          name: ${{ matrix.target }}
+-          path: dist/CLIProxyAPI_*
+-          if-no-files-found: error
+-      - name: Upload release assets
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          shopt -s nullglob
+-          assets=(dist/CLIProxyAPI_*.tar.gz)
+-          if [[ ${#assets[@]} -eq 0 ]]; then
+-            printf 'expected archive assets, found %s\n' "${#assets[@]}" >&2
+-            printf '%s\n' "${assets[@]}" >&2
+-            exit 1
+-          fi
+-          gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+-      - name: Refresh release checksums
+-        continue-on-error: true
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          tmp_dir="$(mktemp -d)"
+-          trap 'rm -rf "$tmp_dir"' EXIT
+-          gh release download "$GITHUB_REF_NAME" \
+-            --pattern 'CLIProxyAPI_*.tar.gz' \
+-            --pattern 'CLIProxyAPI_*.zip' \
+-            --dir "$tmp_dir" \
+-            --clobber
+-          (
+-            cd "$tmp_dir"
+-            shopt -s nullglob
+-            archives=(CLIProxyAPI_*.tar.gz CLIProxyAPI_*.zip)
+-            if [[ ${#archives[@]} -eq 0 ]]; then
+-              echo "No release archives found"
+-              exit 0
+-            fi
+-            if command -v sha256sum >/dev/null 2>&1; then
+-              sha256sum "${archives[@]}" | sort -k2 > checksums.txt
+-            else
+-              shasum -a 256 "${archives[@]}" | sort -k2 > checksums.txt
+-            fi
+-          )
+-          gh release upload "$GITHUB_REF_NAME" "$tmp_dir/checksums.txt" --clobber
+-
+-  build-linux-no-plugin:
+-    name: build linux-${{ matrix.goarch }} no-plugin
+-    needs: prepare-release
+-    runs-on: ubuntu-latest
+-    strategy:
+-      fail-fast: false
+-      matrix:
+-        include:
+-          - target: linux-amd64-no-plugin
+-            goarch: amd64
+-            asset_arch: amd64
+-          - target: linux-arm64-no-plugin
+-            goarch: arm64
+-            asset_arch: aarch64
+-    steps:
+-      - uses: actions/checkout@v6
+-        with:
+-          fetch-depth: 0
+-      - name: Refresh models catalog
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          git fetch --depth 1 https://github.com/router-for-me/models.git main
+-          git show FETCH_HEAD:models.json > internal/registry/models/models.json
+-      - name: Fetch tags
+-        shell: bash
+-        run: git fetch --force --tags
+-      - uses: actions/setup-go@v6
+-        with:
+-          go-version: ${{ env.GO_VERSION }}
+-          cache: true
+-      - uses: actions/cache@v4
+-        with:
+-          path: |
+-            ~/.cache/go-build
+-            ~/go/pkg/mod
+-          key: go-linux-no-plugin-${{ matrix.goarch }}-${{ hashFiles('go.sum') }}
+-          restore-keys: |
+-            go-linux-no-plugin-${{ matrix.goarch }}-
+-            go-linux-no-plugin-
+-      - name: Generate Build Metadata
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-          echo "RELEASE_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+-          echo "COMMIT=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+-          echo "BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+-      - name: Build archive
+-        shell: bash
+-        env:
+-          TARGET: ${{ matrix.target }}
+-          GOARCH: ${{ matrix.goarch }}
+-          ASSET_ARCH: ${{ matrix.asset_arch }}
+-        run: |
+-          set -euo pipefail
+-
+-          archive_dir="dist/${TARGET}/archive"
+-          archive_name="CLIProxyAPI_${RELEASE_VERSION}_linux_${ASSET_ARCH}_no-plugin.tar.gz"
+-          rm -rf "dist/${TARGET}"
+-          mkdir -p "$archive_dir"
+-
+-          CGO_ENABLED=0 GOOS=linux GOARCH="$GOARCH" go build -buildvcs=false \
+-            -ldflags="-s -w -X main.Version=${RELEASE_VERSION} -X main.Commit=${COMMIT} -X main.BuildDate=${BUILD_DATE}" \
+-            -o "$archive_dir/cli-proxy-api" ./cmd/server/
+-
+-          if readelf -l "$archive_dir/cli-proxy-api" | grep -q 'Requesting program interpreter'; then
+-            readelf -l "$archive_dir/cli-proxy-api" >&2
+-            echo "no-plugin linux binary must not require a dynamic interpreter" >&2
+-            exit 1
+-          fi
+-
+-          cp LICENSE README.md README_CN.md config.example.yaml "$archive_dir/"
+-          tar -C "$archive_dir" -czf "dist/$archive_name" cli-proxy-api LICENSE README.md README_CN.md config.example.yaml
+-      - uses: actions/upload-artifact@v4
+-        with:
+-          name: ${{ matrix.target }}
+-          path: dist/CLIProxyAPI_*
+-          if-no-files-found: error
+-      - name: Upload release assets
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          shopt -s nullglob
+-          assets=(dist/CLIProxyAPI_*.tar.gz)
+-          if [[ ${#assets[@]} -eq 0 ]]; then
+-            printf 'expected archive assets, found %s\n' "${#assets[@]}" >&2
+-            printf '%s\n' "${assets[@]}" >&2
+-            exit 1
+-          fi
+-          gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+-      - name: Refresh release checksums
+-        continue-on-error: true
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          tmp_dir="$(mktemp -d)"
+-          trap 'rm -rf "$tmp_dir"' EXIT
+-          gh release download "$GITHUB_REF_NAME" \
+-            --pattern 'CLIProxyAPI_*.tar.gz' \
+-            --pattern 'CLIProxyAPI_*.zip' \
+-            --dir "$tmp_dir" \
+-            --clobber
+-          (
+-            cd "$tmp_dir"
+-            shopt -s nullglob
+-            archives=(CLIProxyAPI_*.tar.gz CLIProxyAPI_*.zip)
+-            if [[ ${#archives[@]} -eq 0 ]]; then
+-              echo "No release archives found"
+-              exit 0
+-            fi
+-            if command -v sha256sum >/dev/null 2>&1; then
+-              sha256sum "${archives[@]}" | sort -k2 > checksums.txt
+-            else
+-              shasum -a 256 "${archives[@]}" | sort -k2 > checksums.txt
+-            fi
+-          )
+-          gh release upload "$GITHUB_REF_NAME" "$tmp_dir/checksums.txt" --clobber
+-
+-  build-freebsd:
+-    name: build freebsd-${{ matrix.goarch }}
+-    needs: prepare-release
+-    runs-on: ubuntu-latest
+-    env:
+-      TARGET: freebsd-${{ matrix.goarch }}
+-      GOARCH: ${{ matrix.goarch }}
+-      ASSET_ARCH: ${{ matrix.asset_arch }}
+-    strategy:
+-      fail-fast: false
+-      matrix:
+-        include:
+-          - goarch: amd64
+-            asset_arch: amd64
+-          - goarch: arm64
+-            asset_arch: aarch64
+-    steps:
+-      - uses: actions/checkout@v6
+-        with:
+-          fetch-depth: 0
+-      - name: Refresh models catalog
+-        run: |
+-          git fetch --depth 1 https://github.com/router-for-me/models.git main
+-          git show FETCH_HEAD:models.json > internal/registry/models/models.json
+-      - name: Fetch tags
+-        run: git fetch --force --tags
+-      - uses: actions/setup-go@v6
+-        with:
+-          go-version: ${{ env.GO_VERSION }}
+-          cache: true
+-      - uses: actions/cache@v4
+-        with:
+-          path: |
+-            ~/.cache/go-build
+-            ~/go/pkg/mod
+-          key: go-freebsd-${{ matrix.goarch }}-${{ hashFiles('go.sum') }}
+-          restore-keys: |
+-            go-freebsd-${{ matrix.goarch }}-
+-            go-freebsd-
+-      - name: Generate Build Metadata
+-        id: metadata
+-        run: |
+-          set -euo pipefail
+-          release_version="${GITHUB_REF_NAME#v}"
+-          commit="$(git rev-parse --short HEAD)"
+-          build_date="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+-          echo "RELEASE_VERSION=$release_version" >> "$GITHUB_ENV"
+-          echo "COMMIT=$commit" >> "$GITHUB_ENV"
+-          echo "BUILD_DATE=$build_date" >> "$GITHUB_ENV"
+-          echo "release_version=$release_version" >> "$GITHUB_OUTPUT"
+-          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+-          echo "build_date=$build_date" >> "$GITHUB_OUTPUT"
+-      - name: Install FreeBSD cross-build dependencies
+-        run: |
+-          set -euo pipefail
+-          rm -rf "dist/${TARGET}"
+-          sudo apt-get update
+-          sudo apt-get install -y clang lld wget
+-      - name: Build FreeBSD binary
+-        timeout-minutes: 45
+-        uses: go-cross/cgo-actions@v1
+-        with:
+-          dir: .
+-          packages: ./cmd/server/
+-          targets: ${{ env.TARGET }}
+-          out-dir: dist/${{ env.TARGET }}/bin
+-          output: cli-proxy-api
+-          flags: >-
+-            -ldflags=-s -w
+-            -X main.Version=${{ steps.metadata.outputs.release_version }}
+-            -X main.Commit=${{ steps.metadata.outputs.commit }}
+-            -X main.BuildDate=${{ steps.metadata.outputs.build_date }}
+-      - name: Package FreeBSD archive
+-        shell: bash
+-        run: |
+-          set -euo pipefail
+-
+-          archive_dir="dist/${TARGET}/archive"
+-          archive_name="CLIProxyAPI_${RELEASE_VERSION}_freebsd_${ASSET_ARCH}.tar.gz"
+-          mkdir -p "$archive_dir"
+-
+-          echo "Packaging ${archive_name}"
+-          cp "dist/${TARGET}/bin/cli-proxy-api" "$archive_dir/cli-proxy-api"
+-          cp LICENSE README.md README_CN.md config.example.yaml "$archive_dir/"
+-          tar -C "$archive_dir" -czf "dist/$archive_name" cli-proxy-api LICENSE README.md README_CN.md config.example.yaml
+-      - uses: actions/upload-artifact@v4
+-        with:
+-          name: freebsd-${{ matrix.goarch }}
+-          path: dist/CLIProxyAPI_*
+-          if-no-files-found: error
+-      - name: Upload release assets
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          shopt -s nullglob
+-          assets=(dist/CLIProxyAPI_*.tar.gz)
+-          if [[ ${#assets[@]} -eq 0 ]]; then
+-            printf 'expected archive assets, found %s\n' "${#assets[@]}" >&2
+-            printf '%s\n' "${assets[@]}" >&2
+-            exit 1
+-          fi
+-          gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+-      - name: Refresh release checksums
+-        continue-on-error: true
+-        shell: bash
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          tmp_dir="$(mktemp -d)"
+-          trap 'rm -rf "$tmp_dir"' EXIT
+-          gh release download "$GITHUB_REF_NAME" \
+-            --pattern 'CLIProxyAPI_*.tar.gz' \
+-            --pattern 'CLIProxyAPI_*.zip' \
+-            --dir "$tmp_dir" \
+-            --clobber
+-          (
+-            cd "$tmp_dir"
+-            shopt -s nullglob
+-            archives=(CLIProxyAPI_*.tar.gz CLIProxyAPI_*.zip)
+-            if [[ ${#archives[@]} -eq 0 ]]; then
+-              echo "No release archives found"
+-              exit 0
+-            fi
+-            if command -v sha256sum >/dev/null 2>&1; then
+-              sha256sum "${archives[@]}" | sort -k2 > checksums.txt
+-            else
+-              shasum -a 256 "${archives[@]}" | sort -k2 > checksums.txt
+-            fi
+-          )
+-          gh release upload "$GITHUB_REF_NAME" "$tmp_dir/checksums.txt" --clobber
+-
+-  publish-checksums:
+-    runs-on: ubuntu-latest
+-    if: always()
+-    needs:
+-      - build-hosted
+-      - build-linux-glibc
+-      - build-linux-no-plugin
+-      - build-freebsd
+-    steps:
+-      - uses: actions/download-artifact@v4
+-        with:
+-          path: dist
+-          merge-multiple: true
+-      - name: Publish final checksums
+-        env:
+-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+-        run: |
+-          set -euo pipefail
+-          cd dist
+-          shopt -s nullglob
+-          archives=(CLIProxyAPI_*.tar.gz CLIProxyAPI_*.zip)
+-          if [[ ${#archives[@]} -eq 0 ]]; then
+-            echo "No release archives found"
+-            exit 0
+-          fi
+-          sha256sum "${archives[@]}" | sort -k2 > checksums.txt
+-          gh release upload "$GITHUB_REF_NAME" checksums.txt --clobber
 diff --git a/.gitignore b/.gitignore
 index 3a3c871b..fd843f37 100644
 --- a/.gitignore
@@ -54,10 +1064,10 @@ index a24a8d61..95b903a4 100644
  FROM debian:bookworm
  
 diff --git a/README.md b/README.md
-index c6a0178b..1a1f8be7 100644
+index c6a0178b..8f79003a 100644
 --- a/README.md
 +++ b/README.md
-@@ -1,218 +1,170 @@
+@@ -1,218 +1,179 @@
 -# CLI Proxy API
 +# CPA-PLUS Docker Branch
  
@@ -87,21 +1097,19 @@ index c6a0178b..1a1f8be7 100644
 +- 一个管理密钥：`remote-management.secret-key`
  
 -Thanks to PackyCode for sponsoring this project!
-+## 快速运行 Docker
  
 -PackyCode is a reliable and efficient API relay service provider, offering relay services for Claude Code, Codex, Gemini, and more.
-+```bash
-+git clone -b main https://github.com/julioaaericksonaa/CPA-PLUS.git
-+cd CPA-PLUS
-+cp config.example.yaml config.yaml
-+```
++## 最近更新：v7.1.54-plus.5
  
 -PackyCode provides special discounts for our software users: register using <a href="https://www.packyapi.com/register?aff=cliproxyapi">this link</a> and enter the "cliproxyapi" promo code during recharge to get 10% off.
-+编辑 `config.yaml`：
++- 修复服务端 Codex 定时巡检不触发：启动 Plus 管理路由后会自动启动后台巡检 worker。
++- 支持配置更新时自动启动/停止巡检 worker，避免修改配置后需要手动重启。
++- 优化 worker 停止流程，服务退出时等待后台任务结束，避免关闭数据库后仍访问 SQLite。
++- 优化 Plus SQLite 并发稳定性：限制单连接并设置 `busy_timeout=5000`，降低 `database is locked` 风险。
++- 已验证按频率巡检可生成 `trigger_type=scheduled` 的历史记录。
  
 ----
-+```yaml
-+port: 8317
++## 快速运行 Docker
  
 -<table>
 -<tbody>
@@ -129,17 +1137,14 @@ index c6a0178b..1a1f8be7 100644
 -</tr>
 -</tbody>
 -</table>
-+remote-management:
-+  allow-remote: true
-+  secret-key: "换成你自己的强密码"
++```bash
++git clone -b main https://github.com/julioaaericksonaa/CPA-PLUS.git
++cd CPA-PLUS
++cp config.example.yaml config.yaml
++```
  
 -## Overview
-+plus-manager:
-+  enabled: true
-+  data-dir: ./data
-+  db-path: ./data/usage.sqlite
-+  collector-enabled: true
-+```
++编辑 `config.yaml`：
  
 -- OpenAI/Gemini/Claude/Grok compatible API endpoints for CLI models
 -- OpenAI Codex support (GPT models) via OAuth login
@@ -159,28 +1164,45 @@ index c6a0178b..1a1f8be7 100644
 -- Grok Build multi-account load balancing
 -- OpenAI-compatible upstream providers via config (e.g., OpenRouter)
 -- Reusable Go SDK for embedding the proxy (see `docs/sdk-usage.md`)
-+启动：
++```yaml
++port: 8317
  
 -## Getting Started
++remote-management:
++  allow-remote: true
++  secret-key: "换成你自己的强密码"
+ 
+-CLIProxyAPI Guides: [https://help.router-for.me/](https://help.router-for.me/)
++plus-manager:
++  enabled: true
++  data-dir: ./data
++  db-path: ./data/usage.sqlite
++  collector-enabled: true
++```
+ 
+-## Management API
++启动：
+ 
+-see [MANAGEMENT_API.md](https://help.router-for.me/management/api)
 +```bash
 +docker compose up -d --build
 +```
  
--CLIProxyAPI Guides: [https://help.router-for.me/](https://help.router-for.me/)
+-## Usage Statistics
 +访问：
  
--## Management API
+-Since v6.10.0, CLIProxyAPI and [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) no longer ship built-in usage statistics. If you need usage statistics, use:
 +```text
 +http://host:8317/management.html
 +```
  
--see [MANAGEMENT_API.md](https://help.router-for.me/management/api)
+-### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
 +## Docker 数据目录
  
--## Usage Statistics
+-Standalone persistence and visualization service for CLIProxyAPI, with periodic data sync, SQLite storage, aggregate APIs, and a built-in dashboard for usage and statistics.
 +默认挂载：
  
--Since v6.10.0, CLIProxyAPI and [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) no longer ship built-in usage statistics. If you need usage statistics, use:
+-### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
 +```text
 +./config.yaml -> /CLIProxyAPI/config.yaml
 +./auths       -> /root/.cli-proxy-api
@@ -188,23 +1210,12 @@ index c6a0178b..1a1f8be7 100644
 +./data        -> /CLIProxyAPI/data
 +```
  
--### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
+-Full CLIProxyAPI management center with request-level monitoring and cost estimates. CPA-Manager tracks collected requests by account, model, channel, latency, status, and token usage; estimates cost with editable model prices and one-click LiteLLM price sync; persists events in SQLite; and provides Codex account-pool operations with batch inspection, quota detection, unhealthy account discovery, cleanup suggestions, and one-click execution for day-to-day multi-account maintenance.
 +Plus 数据库：
  
--Standalone persistence and visualization service for CLIProxyAPI, with periodic data sync, SQLite storage, aggregate APIs, and a built-in dashboard for usage and statistics.
+-## SDK Docs
 +```text
 +./data/usage.sqlite
-+```
- 
--### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
-+## 日常维护
- 
--Full CLIProxyAPI management center with request-level monitoring and cost estimates. CPA-Manager tracks collected requests by account, model, channel, latency, status, and token usage; estimates cost with editable model prices and one-click LiteLLM price sync; persists events in SQLite; and provides Codex account-pool operations with batch inspection, quota detection, unhealthy account discovery, cleanup suggestions, and one-click execution for day-to-day multi-account maintenance.
-+重建并启动：
- 
--## SDK Docs
-+```bash
-+docker compose up -d --build
 +```
  
 -- Usage: [docs/sdk-usage.md](docs/sdk-usage.md)
@@ -212,80 +1223,91 @@ index c6a0178b..1a1f8be7 100644
 -- Access: [docs/sdk-access.md](docs/sdk-access.md)
 -- Watcher: [docs/sdk-watcher.md](docs/sdk-watcher.md)
 -- Custom Provider Example: `examples/custom-provider`
-+查看日志：
++## 日常维护
  
 -## Contributing
-+```bash
-+docker compose logs -f cli-proxy-api
-+```
++重建并启动：
  
 -Contributions are welcome! Please feel free to submit a Pull Request.
-+停止：
++```bash
++docker compose up -d --build
++```
  
 -1. Fork the repository
 -2. Create your feature branch (`git checkout -b feature/amazing-feature`)
 -3. Commit your changes (`git commit -m 'Add some amazing feature'`)
 -4. Push to the branch (`git push origin feature/amazing-feature`)
 -5. Open a Pull Request
++查看日志：
+ 
+-## Who is with us?
++```bash
++docker compose logs -f cli-proxy-api
++```
+ 
+-Those projects are based on CLIProxyAPI:
++停止：
+ 
+-### [vibeproxy](https://github.com/automazeio/vibeproxy)
 +```bash
 +docker compose down
 +```
  
--## Who is with us?
+-Native macOS menu bar app to use your Claude Code & ChatGPT subscriptions with AI coding tools - no API keys needed
 +重启：
  
--Those projects are based on CLIProxyAPI:
+-### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
 +```bash
 +docker compose restart cli-proxy-api
 +```
  
--### [vibeproxy](https://github.com/automazeio/vibeproxy)
+-A cross-platform desktop and web app to translate and validate SRT subtitles using your existing LLM subscriptions (Gemini, ChatGPT, Claude, etc.) via CLIProxyAPI - no API keys needed.
 +## 同步上游
  
--Native macOS menu bar app to use your Claude Code & ChatGPT subscriptions with AI coding tools - no API keys needed
+-### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
 +本分支保留完整源码，适合开发、调试和同步上游。
  
--### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
+-CLI wrapper for instant switching between multiple Claude accounts and alternative models (Gemini, Codex, Antigravity) via CLIProxyAPI OAuth - no API keys needed
 +一键同步两个上游：
  
--A cross-platform desktop and web app to translate and validate SRT subtitles using your existing LLM subscriptions (Gemini, ChatGPT, Claude, etc.) via CLIProxyAPI - no API keys needed.
+-### [Quotio](https://github.com/nguyenphutrong/quotio)
 +```bash
 +./scripts/local-update-all.sh
 +```
  
--### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
+-Native macOS menu bar app that unifies Claude, Gemini, OpenAI, and Antigravity subscriptions with real-time quota tracking and smart auto-failover for AI coding tools like Claude Code, OpenCode, and Droid - no API keys needed.
 +只同步 CLIProxyAPI：
  
--CLI wrapper for instant switching between multiple Claude accounts and alternative models (Gemini, Codex, Antigravity) via CLIProxyAPI OAuth - no API keys needed
+-### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
 +```bash
 +./scripts/local-update-cli.sh
 +```
  
--### [Quotio](https://github.com/nguyenphutrong/quotio)
+-Windows-native CLIProxyAPI fork with TUI, system tray, and multi-provider OAuth for AI coding tools - no API keys needed.
 +只同步 Plus 前端：
  
--Native macOS menu bar app that unifies Claude, Gemini, OpenAI, and Antigravity subscriptions with real-time quota tracking and smart auto-failover for AI coding tools like Claude Code, OpenCode, and Droid - no API keys needed.
+-### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
 +```bash
 +./scripts/local-update-plus-web.sh
 +```
  
--### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
+-VSCode extension for quick switching between Claude Code models, featuring integrated CLIProxyAPI as its backend with automatic background lifecycle management.
 +同步后：
  
--Windows-native CLIProxyAPI fork with TUI, system tray, and multi-provider OAuth for AI coding tools - no API keys needed.
+-### [ZeroLimit](https://github.com/0xtbug/zero-limit)
 +```bash
 +git status --short
 +git diff --stat
 +docker compose up -d --build
 +```
  
--### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
+-Windows desktop app built with Tauri + React for monitoring AI coding assistant quotas via CLIProxyAPI. Track usage across Gemini, Claude, OpenAI Codex, and Antigravity accounts with real-time dashboard, system tray integration, and one-click proxy control - no API keys needed.
 +## 隐私安全
  
--VSCode extension for quick switching between Claude Code models, featuring integrated CLIProxyAPI as its backend with automatic background lifecycle management.
+-### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
 +不要提交：
  
--### [ZeroLimit](https://github.com/0xtbug/zero-limit)
+-A lightweight web admin panel for CLIProxyAPI with health checks, resource monitoring, real-time logs, auto-update, request statistics and pricing display. Supports one-click installation and systemd service.
 +```text
 +config.yaml
 +.env
@@ -301,37 +1323,31 @@ index c6a0178b..1a1f8be7 100644
 +.gemini/
 +```
  
--Windows desktop app built with Tauri + React for monitoring AI coding assistant quotas via CLIProxyAPI. Track usage across Gemini, Claude, OpenAI Codex, and Antigravity accounts with real-time dashboard, system tray integration, and one-click proxy control - no API keys needed.
+-### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
 +提交前检查：
  
--### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
+-A Windows tray application implemented using PowerShell scripts, without relying on any third-party libraries. The main features include: automatic creation of shortcuts, silent running, password management, channel switching (Main / Plus), and automatic downloading and updating.
 +```bash
 +git status --short
 +git diff --cached --name-only
 +```
  
--A lightweight web admin panel for CLIProxyAPI with health checks, resource monitoring, real-time logs, auto-update, request statistics and pricing display. Supports one-click installation and systemd service.
+-### [霖君](https://github.com/wangdabaoqq/LinJun)
 +## 相关文档
  
--### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
+-霖君 is a cross-platform desktop application for managing AI programming assistants, supporting macOS, Windows, and Linux systems. Unified management of Claude Code, Gemini CLI, OpenAI Codex, and other AI coding tools, with local proxy for multi-account quota tracking and one-click configuration.
 +```text
 +docs/cpa-plus-integrated.md
 +docs/cpa-plus-work-log-and-maintenance.md
 +docs/local-upstream-sync.md
 +```
  
--A Windows tray application implemented using PowerShell scripts, without relying on any third-party libraries. The main features include: automatic creation of shortcuts, silent running, password management, channel switching (Main / Plus), and automatic downloading and updating.
+-### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
 +## 来源
  
--### [霖君](https://github.com/wangdabaoqq/LinJun)
+-A modern web-based management dashboard for CLIProxyAPI built with Next.js, React, and PostgreSQL. Features real-time log streaming, structured configuration editing, API key management, OAuth provider integration for Claude/Gemini/Codex, usage analytics, container management, and config sync with OpenCode via companion plugin - no manual YAML editing needed.
 +CPA-PLUS 基于以下项目整合维护：
  
--霖君 is a cross-platform desktop application for managing AI programming assistants, supporting macOS, Windows, and Linux systems. Unified management of Claude Code, Gemini CLI, OpenAI Codex, and other AI coding tools, with local proxy for multi-account quota tracking and one-click configuration.
--
--### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
--
--A modern web-based management dashboard for CLIProxyAPI built with Next.js, React, and PostgreSQL. Features real-time log streaming, structured configuration editing, API key management, OAuth provider integration for Claude/Gemini/Codex, usage analytics, container management, and config sync with OpenCode via companion plugin - no manual YAML editing needed.
--
 -### [All API Hub](https://github.com/qixing-jk/all-api-hub)
 -
 -Browser extension for one-stop management of New API-compatible relay site accounts, featuring balance and usage dashboards, auto check-in, one-click key export to common apps, in-page API availability testing, and channel/model sync and redirection. It integrates with CLIProxyAPI through the Management API for one-click provider import and config sync.
@@ -397,10 +1413,10 @@ index c6a0178b..1a1f8be7 100644
 +- CLIProxyAPI：https://github.com/router-for-me/CLIProxyAPI
 +- CPA-Manager-Plus：https://github.com/seakee/CPA-Manager-Plus
 diff --git a/README_CN.md b/README_CN.md
-index 94579885..1a1f8be7 100644
+index 94579885..8f79003a 100644
 --- a/README_CN.md
 +++ b/README_CN.md
-@@ -1,223 +1,170 @@
+@@ -1,223 +1,179 @@
 -# CLI 代理 API
 +# CPA-PLUS Docker Branch
  
@@ -430,21 +1446,19 @@ index 94579885..1a1f8be7 100644
 +- 一个管理密钥：`remote-management.secret-key`
  
 -感谢 PackyCode 对本项目的赞助！
-+## 快速运行 Docker
  
 -PackyCode 是一家可靠高效的 API 中转服务商，提供 Claude Code、Codex、Gemini 等多种服务的中转。
-+```bash
-+git clone -b main https://github.com/julioaaericksonaa/CPA-PLUS.git
-+cd CPA-PLUS
-+cp config.example.yaml config.yaml
-+```
++## 最近更新：v7.1.54-plus.5
  
 -PackyCode 为本软件用户提供了特别优惠：使用<a href="https://www.packyapi.com/register?aff=cliproxyapi" target="_blank">此链接</a>注册，并在充值时输入 "cliproxyapi" 优惠码即可享受九折优惠。
-+编辑 `config.yaml`：
++- 修复服务端 Codex 定时巡检不触发：启动 Plus 管理路由后会自动启动后台巡检 worker。
++- 支持配置更新时自动启动/停止巡检 worker，避免修改配置后需要手动重启。
++- 优化 worker 停止流程，服务退出时等待后台任务结束，避免关闭数据库后仍访问 SQLite。
++- 优化 Plus SQLite 并发稳定性：限制单连接并设置 `busy_timeout=5000`，降低 `database is locked` 风险。
++- 已验证按频率巡检可生成 `trigger_type=scheduled` 的历史记录。
  
 ----
-+```yaml
-+port: 8317
++## 快速运行 Docker
  
 -<table>
 -<tbody>
@@ -472,19 +1486,17 @@ index 94579885..1a1f8be7 100644
 -</tr>
 -</tbody>
 -</table>
-+remote-management:
-+  allow-remote: true
-+  secret-key: "换成你自己的强密码"
- 
-+plus-manager:
-+  enabled: true
-+  data-dir: ./data
-+  db-path: ./data/usage.sqlite
-+  collector-enabled: true
++```bash
++git clone -b main https://github.com/julioaaericksonaa/CPA-PLUS.git
++cd CPA-PLUS
++cp config.example.yaml config.yaml
 +```
  
++编辑 `config.yaml`：
+ 
 -## 功能特性
-+启动：
++```yaml
++port: 8317
  
 -- 为 CLI 模型提供 OpenAI/Gemini/Claude/Codex/Grok 兼容的 API 端点
 -- 新增 OpenAI Codex（GPT 系列）支持（OAuth 登录）
@@ -503,25 +1515,41 @@ index 94579885..1a1f8be7 100644
 -- 支持 Grok Build 多账户轮询
 -- 通过配置接入上游 OpenAI 兼容提供商（例如 OpenRouter）
 -- 可复用的 Go SDK（见 `docs/sdk-usage_CN.md`）
++remote-management:
++  allow-remote: true
++  secret-key: "换成你自己的强密码"
+ 
+-## 新手入门
++plus-manager:
++  enabled: true
++  data-dir: ./data
++  db-path: ./data/usage.sqlite
++  collector-enabled: true
++```
+ 
+-CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
++启动：
+ 
+-## 管理 API 文档
 +```bash
 +docker compose up -d --build
 +```
  
--## 新手入门
+-请参见 [MANAGEMENT_API_CN.md](https://help.router-for.me/cn/management/api)
 +访问：
  
--CLIProxyAPI 用户手册： [https://help.router-for.me/](https://help.router-for.me/cn/)
+-## 使用量统计
 +```text
 +http://host:8317/management.html
 +```
  
--## 管理 API 文档
+-自v6.10.0版本以后，CLIProxyAPI及 [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) 项目不再预置数据统计功能，如果有数据统计需求的请使用以下项目：
 +## Docker 数据目录
  
--请参见 [MANAGEMENT_API_CN.md](https://help.router-for.me/cn/management/api)
+-### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
 +默认挂载：
  
--## 使用量统计
+-独立的 CLIProxyAPI 使用量持久化与可视化服务，定期同步 CLIProxyAPI 数据，存储到 SQLite，提供聚合 API，并内置使用量分析与统计仪表盘。
 +```text
 +./config.yaml -> /CLIProxyAPI/config.yaml
 +./auths       -> /root/.cli-proxy-api
@@ -529,104 +1557,104 @@ index 94579885..1a1f8be7 100644
 +./data        -> /CLIProxyAPI/data
 +```
  
--自v6.10.0版本以后，CLIProxyAPI及 [CPAMC](https://github.com/router-for-me/Cli-Proxy-API-Management-Center) 项目不再预置数据统计功能，如果有数据统计需求的请使用以下项目：
+-### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
 +Plus 数据库：
  
--### [CPA Usage Keeper](https://github.com/Willxup/cpa-usage-keeper)
+-面向 CLIProxyAPI 的完整管理中心，提供请求级监控和费用预估。CPA-Manager 可按账号、模型、渠道、延迟、状态和 token 用量追踪采集到的请求；支持可编辑模型价格与一键同步 LiteLLM 价格来估算费用；用 SQLite 持久化事件；并提供面向 Codex 账号池的批量巡检、配额识别、异常账号定位、清理建议与一键执行能力，适合多账号池的日常运维管理。
 +```text
 +./data/usage.sqlite
 +```
  
--独立的 CLIProxyAPI 使用量持久化与可视化服务，定期同步 CLIProxyAPI 数据，存储到 SQLite，提供聚合 API，并内置使用量分析与统计仪表盘。
-+## 日常维护
- 
--### [CPA-Manager-Plus](https://github.com/seakee/CPA-Manager-Plus)
-+重建并启动：
- 
--面向 CLIProxyAPI 的完整管理中心，提供请求级监控和费用预估。CPA-Manager 可按账号、模型、渠道、延迟、状态和 token 用量追踪采集到的请求；支持可编辑模型价格与一键同步 LiteLLM 价格来估算费用；用 SQLite 持久化事件；并提供面向 Codex 账号池的批量巡检、配额识别、异常账号定位、清理建议与一键执行能力，适合多账号池的日常运维管理。
-+```bash
-+docker compose up -d --build
-+```
- 
 -## SDK 文档
-+查看日志：
++## 日常维护
  
 -- 使用文档：[docs/sdk-usage_CN.md](docs/sdk-usage_CN.md)
 -- 高级（执行器与翻译器）：[docs/sdk-advanced_CN.md](docs/sdk-advanced_CN.md)
 -- 认证: [docs/sdk-access_CN.md](docs/sdk-access_CN.md)
 -- 凭据加载/更新: [docs/sdk-watcher_CN.md](docs/sdk-watcher_CN.md)
 -- 自定义 Provider 示例：`examples/custom-provider`
-+```bash
-+docker compose logs -f cli-proxy-api
-+```
++重建并启动：
  
 -## 贡献
-+停止：
++```bash
++docker compose up -d --build
++```
  
 -欢迎贡献！请随时提交 Pull Request。
-+```bash
-+docker compose down
-+```
++查看日志：
  
 -1. Fork 仓库
 -2. 创建您的功能分支（`git checkout -b feature/amazing-feature`）
 -3. 提交您的更改（`git commit -m 'Add some amazing feature'`）
 -4. 推送到分支（`git push origin feature/amazing-feature`）
 -5. 打开 Pull Request
-+重启：
++```bash
++docker compose logs -f cli-proxy-api
++```
  
 -## 谁与我们在一起？
++停止：
+ 
+-这些项目基于 CLIProxyAPI:
++```bash
++docker compose down
++```
+ 
+-### [vibeproxy](https://github.com/automazeio/vibeproxy)
++重启：
+ 
+-一个原生 macOS 菜单栏应用，让您可以使用 Claude Code & ChatGPT 订阅服务和 AI 编程工具，无需 API 密钥。
 +```bash
 +docker compose restart cli-proxy-api
 +```
  
--这些项目基于 CLIProxyAPI:
+-### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
 +## 同步上游
  
--### [vibeproxy](https://github.com/automazeio/vibeproxy)
+-一款跨平台的桌面和 Web 应用程序，可通过 CLIProxyAPI 使用您现有的 LLM 订阅（Gemini、ChatGPT、Claude, etc.）来翻译和验证 SRT 字幕 - 无需 API 密钥。
 +本分支保留完整源码，适合开发、调试和同步上游。
  
--一个原生 macOS 菜单栏应用，让您可以使用 Claude Code & ChatGPT 订阅服务和 AI 编程工具，无需 API 密钥。
+-### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
 +一键同步两个上游：
  
--### [Subtitle Translator](https://github.com/VjayC/SRT-Subtitle-Translator-Validator)
+-CLI 封装器，用于通过 CLIProxyAPI OAuth 即时切换多个 Claude 账户和替代模型（Gemini, Codex, Antigravity），无需 API 密钥。
 +```bash
 +./scripts/local-update-all.sh
 +```
  
--一款跨平台的桌面和 Web 应用程序，可通过 CLIProxyAPI 使用您现有的 LLM 订阅（Gemini、ChatGPT、Claude, etc.）来翻译和验证 SRT 字幕 - 无需 API 密钥。
+-### [Quotio](https://github.com/nguyenphutrong/quotio)
 +只同步 CLIProxyAPI：
  
--### [CCS (Claude Code Switch)](https://github.com/kaitranntt/ccs)
+-原生 macOS 菜单栏应用，统一管理 Claude、Gemini、OpenAI 和 Antigravity 订阅，提供实时配额追踪和智能自动故障转移，支持 Claude Code、OpenCode 和 Droid 等 AI 编程工具，无需 API 密钥。
 +```bash
 +./scripts/local-update-cli.sh
 +```
  
--CLI 封装器，用于通过 CLIProxyAPI OAuth 即时切换多个 Claude 账户和替代模型（Gemini, Codex, Antigravity），无需 API 密钥。
+-### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
 +只同步 Plus 前端：
  
--### [Quotio](https://github.com/nguyenphutrong/quotio)
+-原生 Windows CLIProxyAPI 分支，集成 TUI、系统托盘及多服务商 OAuth 认证，专为 AI 编程工具打造，无需 API 密钥。
 +```bash
 +./scripts/local-update-plus-web.sh
 +```
  
--原生 macOS 菜单栏应用，统一管理 Claude、Gemini、OpenAI 和 Antigravity 订阅，提供实时配额追踪和智能自动故障转移，支持 Claude Code、OpenCode 和 Droid 等 AI 编程工具，无需 API 密钥。
+-### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
 +同步后：
  
--### [ProxyPilot](https://github.com/Finesssee/ProxyPilot)
+-一款 VSCode 扩展，提供了在 VSCode 中快速切换 Claude Code 模型的功能，内置 CLIProxyAPI 作为其后端，支持后台自动启动和关闭。
 +```bash
 +git status --short
 +git diff --stat
 +docker compose up -d --build
 +```
  
--原生 Windows CLIProxyAPI 分支，集成 TUI、系统托盘及多服务商 OAuth 认证，专为 AI 编程工具打造，无需 API 密钥。
+-### [ZeroLimit](https://github.com/0xtbug/zero-limit)
 +## 隐私安全
  
--### [Claude Proxy VSCode](https://github.com/uzhao/claude-proxy-vscode)
+-Windows 桌面应用，基于 Tauri + React 构建，用于通过 CLIProxyAPI 监控 AI 编程助手配额。支持跨 Gemini、Claude、OpenAI Codex 和 Antigravity 账户的使用量追踪，提供实时仪表盘、系统托盘集成和一键代理控制，无需 API 密钥。
 +不要提交：
  
--一款 VSCode 扩展，提供了在 VSCode 中快速切换 Claude Code 模型的功能，内置 CLIProxyAPI 作为其后端，支持后台自动启动和关闭。
+-### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
 +```text
 +config.yaml
 +.env
@@ -642,37 +1670,31 @@ index 94579885..1a1f8be7 100644
 +.gemini/
 +```
  
--### [ZeroLimit](https://github.com/0xtbug/zero-limit)
+-面向 CLIProxyAPI 的 Web 管理面板，提供健康检查、资源监控、日志查看、自动更新、请求统计与定价展示，支持一键安装与 systemd 服务。
 +提交前检查：
  
--Windows 桌面应用，基于 Tauri + React 构建，用于通过 CLIProxyAPI 监控 AI 编程助手配额。支持跨 Gemini、Claude、OpenAI Codex 和 Antigravity 账户的使用量追踪，提供实时仪表盘、系统托盘集成和一键代理控制，无需 API 密钥。
+-### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
 +```bash
 +git status --short
 +git diff --cached --name-only
 +```
  
--### [CPA-XXX Panel](https://github.com/ferretgeek/CPA-X)
+-Windows 托盘应用，基于 PowerShell 脚本实现，不依赖任何第三方库。主要功能包括：自动创建快捷方式、静默运行、密码管理、通道切换（Main / Plus）以及自动下载与更新。
 +## 相关文档
  
--面向 CLIProxyAPI 的 Web 管理面板，提供健康检查、资源监控、日志查看、自动更新、请求统计与定价展示，支持一键安装与 systemd 服务。
+-### [霖君](https://github.com/wangdabaoqq/LinJun)
 +```text
 +docs/cpa-plus-integrated.md
 +docs/cpa-plus-work-log-and-maintenance.md
 +docs/local-upstream-sync.md
 +```
  
--### [CLIProxyAPI Tray](https://github.com/kitephp/CLIProxyAPI_Tray)
+-霖君是一款用于管理AI编程助手的跨平台桌面应用，支持macOS、Windows、Linux系统。统一管理Claude Code、Gemini CLI、OpenAI Codex等AI编程工具，本地代理实现多账户配额跟踪和一键配置。
 +## 来源
  
--Windows 托盘应用，基于 PowerShell 脚本实现，不依赖任何第三方库。主要功能包括：自动创建快捷方式、静默运行、密码管理、通道切换（Main / Plus）以及自动下载与更新。
+-### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
 +CPA-PLUS 基于以下项目整合维护：
  
--### [霖君](https://github.com/wangdabaoqq/LinJun)
--
--霖君是一款用于管理AI编程助手的跨平台桌面应用，支持macOS、Windows、Linux系统。统一管理Claude Code、Gemini CLI、OpenAI Codex等AI编程工具，本地代理实现多账户配额跟踪和一键配置。
--
--### [CLIProxyAPI Dashboard](https://github.com/itsmylife44/cliproxyapi-dashboard)
--
 -一个面向 CLIProxyAPI 的现代化 Web 管理仪表盘，基于 Next.js、React 和 PostgreSQL 构建。支持实时日志流、结构化配置编辑、API Key 管理、Claude/Gemini/Codex 的 OAuth 提供方集成、使用量分析、容器管理，并可通过配套插件与 OpenCode 同步配置，无需手动编辑 YAML。
 -
 -### [All API Hub](https://github.com/qixing-jk/all-api-hub)
@@ -974,6 +1996,40 @@ index 5bfaf53b..41cb35fe 100644
 -
 -本プロジェクトはMITライセンスの下でライセンスされています - 詳細は[LICENSE](LICENSE)ファイルを参照してください。
 +注意：実運用の `config.yaml`、`.env`、`auths/`、`data/`、`logs/`、Token、Cookie、ローカル認証情報を GitHub にコミットしないでください。
+diff --git a/cmd/server/main.go b/cmd/server/main.go
+index e280b0db..e1f72824 100644
+--- a/cmd/server/main.go
++++ b/cmd/server/main.go
+@@ -39,10 +39,14 @@ import (
+ )
+ 
+ var (
+-	Version           = "dev"
+-	Commit            = "none"
+-	BuildDate         = "unknown"
+-	DefaultConfigPath = ""
++	Version             = "dev"
++	Commit              = "none"
++	BuildDate           = "unknown"
++	CLIUpstreamVersion  = ""
++	CLIUpstreamCommit   = ""
++	PlusUpstreamVersion = ""
++	PlusUpstreamCommit  = ""
++	DefaultConfigPath   = ""
+ )
+ 
+ // init initializes the shared logger setup.
+@@ -51,6 +55,10 @@ func init() {
+ 	buildinfo.Version = Version
+ 	buildinfo.Commit = Commit
+ 	buildinfo.BuildDate = BuildDate
++	buildinfo.CLIUpstreamVersion = CLIUpstreamVersion
++	buildinfo.CLIUpstreamCommit = CLIUpstreamCommit
++	buildinfo.PlusUpstreamVersion = PlusUpstreamVersion
++	buildinfo.PlusUpstreamCommit = PlusUpstreamCommit
+ }
+ 
+ func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
 index 98a3d753..4807c6a6 100644
 --- a/config.example.yaml
@@ -1918,6 +2974,26 @@ index 5f0a03fb..4f6f5f40 100644
 +modernc.org/token v1.1.0/go.mod h1:UGzOrNV1mAFSEB63lOFHIpNRUVMvYTc6yu1SMY/XTDM=
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
+diff --git a/internal/api/handlers/management/handler.go b/internal/api/handlers/management/handler.go
+index 01e96f05..91f5c98c 100644
+--- a/internal/api/handlers/management/handler.go
++++ b/internal/api/handlers/management/handler.go
+@@ -165,9 +165,13 @@ func (h *Handler) SetPostAuthPersistHook(hook coreauth.PostAuthHook) {
+ // Additionally, remote access requires allow-remote-management=true.
+ func (h *Handler) Middleware() gin.HandlerFunc {
+ 	return func(c *gin.Context) {
+-		c.Header("X-CPA-VERSION", buildinfo.Version)
+-		c.Header("X-CPA-COMMIT", buildinfo.Commit)
++		c.Header("X-CPA-VERSION", buildinfo.ServerVersion())
++		c.Header("X-CPA-COMMIT", buildinfo.ServerCommit())
+ 		c.Header("X-CPA-BUILD-DATE", buildinfo.BuildDate)
++		c.Header("X-CPA-UPSTREAM-VERSION", buildinfo.ServerVersion())
++		c.Header("X-CPA-UPSTREAM-COMMIT", buildinfo.ServerCommit())
++		c.Header("X-PLUS-UPSTREAM-VERSION", buildinfo.ManagerVersion())
++		c.Header("X-PLUS-UPSTREAM-COMMIT", buildinfo.ManagerVersion())
+ 
+ 		clientIP := c.ClientIP()
+ 		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
 index a148dd87..bc51f822 100644
 --- a/internal/api/server.go
@@ -2380,6 +3456,118 @@ index c01dff2b..7fe6b4cb 100644
  func TestManagementUsageRequiresManagementAuthAndPopsArray(t *testing.T) {
  	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
  
+diff --git a/internal/buildinfo/buildinfo.go b/internal/buildinfo/buildinfo.go
+index 0bdfaf8b..b6432c02 100644
+--- a/internal/buildinfo/buildinfo.go
++++ b/internal/buildinfo/buildinfo.go
+@@ -12,4 +12,63 @@ var (
+ 
+ 	// BuildDate records when the binary was built in UTC.
+ 	BuildDate = "unknown"
++
++	// CLIUpstreamVersion is the CLIProxyAPI upstream tag/ref baked into CPA-PLUS builds.
++	CLIUpstreamVersion = ""
++
++	// CLIUpstreamCommit is the CLIProxyAPI upstream commit baked into CPA-PLUS builds.
++	CLIUpstreamCommit = ""
++
++	// PlusUpstreamVersion is the CPA-Manager-Plus upstream tag/ref baked into CPA-PLUS builds.
++	PlusUpstreamVersion = ""
++
++	// PlusUpstreamCommit is the CPA-Manager-Plus upstream commit baked into CPA-PLUS builds.
++	PlusUpstreamCommit = ""
+ )
++
++// ServerVersion returns the user-facing server version. CPA-PLUS integrated
++// builds intentionally expose the upstream CLIProxyAPI version instead of the
++// private CPA-PLUS build version.
++func ServerVersion() string {
++	if trimmed := trim(CLIUpstreamVersion); trimmed != "" {
++		return trimmed
++	}
++	return trim(Version)
++}
++
++// ServerCommit returns the short upstream CLIProxyAPI commit for display.
++func ServerCommit() string {
++	return shortCommit(CLIUpstreamCommit)
++}
++
++// ManagerVersion returns the user-facing manager panel version. CPA-Manager-Plus
++// may not publish release tags, so the upstream commit is the stable fallback.
++func ManagerVersion() string {
++	if trimmed := trim(PlusUpstreamVersion); trimmed != "" {
++		return trimmed
++	}
++	if commit := shortCommit(PlusUpstreamCommit); commit != "" {
++		return commit
++	}
++	return "dev"
++}
++
++func shortCommit(value string) string {
++	trimmed := trim(value)
++	if len(trimmed) > 8 {
++		return trimmed[:8]
++	}
++	return trimmed
++}
++
++func trim(value string) string {
++	start := 0
++	end := len(value)
++	for start < end && (value[start] == ' ' || value[start] == '\t' || value[start] == '\n' || value[start] == '\r') {
++		start++
++	}
++	for end > start && (value[end-1] == ' ' || value[end-1] == '\t' || value[end-1] == '\n' || value[end-1] == '\r') {
++		end--
++	}
++	return value[start:end]
++}
+diff --git a/internal/buildinfo/buildinfo_test.go b/internal/buildinfo/buildinfo_test.go
+new file mode 100644
+index 00000000..6c99fd0c
+--- /dev/null
++++ b/internal/buildinfo/buildinfo_test.go
+@@ -0,0 +1,38 @@
++package buildinfo
++
++import "testing"
++
++func TestServerVersionUsesCLIUpstreamWhenAvailable(t *testing.T) {
++	oldVersion, oldCommit := Version, Commit
++	oldCLIVersion, oldCLICommit := CLIUpstreamVersion, CLIUpstreamCommit
++	t.Cleanup(func() {
++		Version, Commit = oldVersion, oldCommit
++		CLIUpstreamVersion, CLIUpstreamCommit = oldCLIVersion, oldCLICommit
++	})
++
++	Version = "v7.1.54-plus.9"
++	Commit = "private-plus"
++	CLIUpstreamVersion = "v7.1.54"
++	CLIUpstreamCommit = "07c607b7abcdef"
++
++	if got, want := ServerVersion(), "v7.1.54"; got != want {
++		t.Fatalf("ServerVersion() = %q, want %q", got, want)
++	}
++	if got, want := ServerCommit(), "07c607b7"; got != want {
++		t.Fatalf("ServerCommit() = %q, want %q", got, want)
++	}
++}
++
++func TestManagerVersionUsesPlusUpstreamCommit(t *testing.T) {
++	oldPlusVersion, oldPlusCommit := PlusUpstreamVersion, PlusUpstreamCommit
++	t.Cleanup(func() {
++		PlusUpstreamVersion, PlusUpstreamCommit = oldPlusVersion, oldPlusCommit
++	})
++
++	PlusUpstreamVersion = ""
++	PlusUpstreamCommit = "5ee6e23abcdef"
++
++	if got, want := ManagerVersion(), "5ee6e23a"; got != want {
++		t.Fatalf("ManagerVersion() = %q, want %q", got, want)
++	}
++}
 diff --git a/internal/config/config.go b/internal/config/config.go
 index 38283e14..398cc4de 100644
 --- a/internal/config/config.go

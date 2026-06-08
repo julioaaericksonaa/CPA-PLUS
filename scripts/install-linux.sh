@@ -103,4 +103,13 @@ ss -ltnp 2>/dev/null | grep ':${PORT} ' || true
 EOF2
 
 chmod 755 "${APP_DIR}/start-detached.sh" "${APP_DIR}/stop.sh" "${APP_DIR}/restart.sh"
+
+if [[ -w /usr/local/bin ]]; then
+  cp "${ROOT_DIR}/scripts/update-cpa" /usr/local/bin/update-cpa
+  chmod 755 /usr/local/bin/update-cpa
+  echo "Installed update command: /usr/local/bin/update-cpa"
+else
+  echo "Skipped installing /usr/local/bin/update-cpa: /usr/local/bin is not writable" >&2
+fi
+
 echo "Installed CPA-PLUS binary project to ${APP_DIR} on port ${PORT}"

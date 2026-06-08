@@ -121,19 +121,36 @@ rsync -a --delete \
 
 python3 "${WEB_PATCHER}" "${OUT_DIR}/web/manager-plus"
 
+WEB_OVERLAY="${ROOT_DIR}/cpa-plus-web/overlay"
+if [[ -d "${WEB_OVERLAY}" ]]; then
+  rsync -a "${WEB_OVERLAY}/" "${OUT_DIR}/web/manager-plus/"
+fi
+
 if [[ "${SKIP_LOCK}" != "1" && -f "${OUT_DIR}/web/manager-plus/package.json" && ! -f "${OUT_DIR}/web/manager-plus/package-lock.json" ]]; then
   require_cmd npm
   echo "==> Generating package-lock.json for Plus web"
   npm --prefix "${OUT_DIR}/web/manager-plus" install --package-lock-only --ignore-scripts
 fi
 
+cli_upstream_version() {
+  git -C "${CLONE_DIR}" describe --tags --exact-match 2>/dev/null || \
+    git -C "${CLONE_DIR}" describe --tags --abbrev=0 2>/dev/null || \
+    printf '%s\n' "${CLI_REF}"
+}
+
+plus_upstream_version() {
+  git -C "${PLUS_DIR}" rev-parse --short=8 HEAD
+}
+
 cat > "${OUT_DIR}/.cpa-plus-auto-build.env" <<META
 CPA_PLUS_BRANCH=linux
 CLI_UPSTREAM_REPO=${CLI_REPO}
 CLI_UPSTREAM_REF=${CLI_REF}
+CLI_UPSTREAM_VERSION=$(cli_upstream_version)
 CLI_UPSTREAM_COMMIT=$(git -C "${CLONE_DIR}" rev-parse HEAD)
 PLUS_UPSTREAM_REPO=${PLUS_REPO}
 PLUS_UPSTREAM_REF=${PLUS_REF}
+PLUS_UPSTREAM_VERSION=$(plus_upstream_version)
 PLUS_UPSTREAM_COMMIT=$(git -C "${PLUS_DIR}" rev-parse HEAD)
 PATCH_SOURCE_COMMIT=$(cat "${ROOT_DIR}/CPA_PLUS_SOURCE_COMMIT" 2>/dev/null || true)
 PREPARED_AT_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)

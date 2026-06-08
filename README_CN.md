@@ -191,6 +191,16 @@ journalctl -u cliproxyapi-plus -f
 
 ## 更新二进制项目
 
+日常更新推荐直接使用全局命令：
+
+```bash
+update-cpa
+```
+
+它会先拉取本仓库 `linux` 分支最新维护脚本，再同步两个上游项目，重建二进制并重启 `/root/apps/cliproxyapi-plus` 服务。
+
+仓库内也可以手动执行：
+
 ```bash
 ./scripts/update-linux.sh --skip-tests
 ```
