@@ -10,7 +10,7 @@ CPA-Manager-Plus, rebuild the Linux binary, install it to /root/apps/cliproxyapi
 and restart the service on port 8317.
 
 Environment:
-  CPA_PLUS_REPO_DIR      Local CPA-PLUS checkout. Default: /root/.config/superpowers/worktrees/CLIProxyAPI/auto
+  CPA_PLUS_REPO_DIR      Local CPA-PLUS checkout. Default: /root/.config/superpowers/worktrees/CLIProxyAPI/main
   CPA_PLUS_APP_DIR       Install directory. Default: /root/apps/cliproxyapi-plus
   CPA_PLUS_PORT          Service port. Default: 8317
   CPA_PLUS_SKIP_TESTS    Default: 1
@@ -24,7 +24,7 @@ case "${1:-}" in
     ;;
 esac
 
-REPO_DIR="${CPA_PLUS_REPO_DIR:-/root/.config/superpowers/worktrees/CLIProxyAPI/auto}"
+REPO_DIR="${CPA_PLUS_REPO_DIR:-/root/.config/superpowers/worktrees/CLIProxyAPI/main}"
 BRANCH="${CPA_PLUS_BRANCH:-main}"
 APP_DIR="${CPA_PLUS_APP_DIR:-/root/apps/cliproxyapi-plus}"
 PORT="${CPA_PLUS_PORT:-8317}"

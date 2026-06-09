@@ -81,7 +81,7 @@ update-cpa
 默认参数：
 
 ```text
-CPA_PLUS_REPO_DIR=/root/.config/superpowers/worktrees/CLIProxyAPI/auto
+CPA_PLUS_REPO_DIR=/root/.config/superpowers/worktrees/CLIProxyAPI/main
 CPA_PLUS_APP_DIR=/root/apps/cliproxyapi-plus
 CPA_PLUS_PORT=8317
 CPA_PLUS_SKIP_TESTS=1
