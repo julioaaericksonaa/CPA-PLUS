@@ -28,3 +28,6 @@ logs/
 .vscode/
 __pycache__/
 *.py[cod]
+secrets.env
+management-key.txt
+*.bak.*
