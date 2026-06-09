@@ -6,7 +6,7 @@ OUT_DIR="${CPA_PLUS_OUTPUT_SOURCE:-${ROOT_DIR}/.build/out/CLIProxyAPI}"
 DIST_DIR="${CPA_PLUS_DIST_DIR:-${ROOT_DIR}/dist}"
 BINARY_NAME="${CPA_PLUS_BINARY_NAME:-CLIProxyAPI-linux-amd64}"
 SKIP_TESTS="${CPA_PLUS_SKIP_TESTS:-0}"
-VERSION="${CPA_PLUS_VERSION:-v7.1.54-plus.2}"
+VERSION="${CPA_PLUS_VERSION:-}"
 COMMIT_SUFFIX="${CPA_PLUS_COMMIT_SUFFIX:-plus}"
 
 "${ROOT_DIR}/cpa-plus-core/prepare-source.sh" "$@"
@@ -16,10 +16,13 @@ if [[ -f "${META_FILE}" ]]; then
   # shellcheck disable=SC1090
   source "${META_FILE}"
 fi
-CLI_UPSTREAM_VERSION="${CLI_UPSTREAM_VERSION:-${VERSION}}"
+CLI_UPSTREAM_VERSION="${CLI_UPSTREAM_VERSION:-${VERSION:-dev}}"
 CLI_UPSTREAM_COMMIT="${CLI_UPSTREAM_COMMIT:-$(git -C "${OUT_DIR}" rev-parse HEAD 2>/dev/null || echo none)}"
 PLUS_UPSTREAM_VERSION="${PLUS_UPSTREAM_VERSION:-dev}"
 PLUS_UPSTREAM_COMMIT="${PLUS_UPSTREAM_COMMIT:-none}"
+if [[ -z "${VERSION}" ]]; then
+  VERSION="${CLI_UPSTREAM_VERSION}-plus"
+fi
 
 if [[ ! -d "${OUT_DIR}/web/manager-plus" ]]; then
   echo "missing Plus web source: ${OUT_DIR}/web/manager-plus" >&2

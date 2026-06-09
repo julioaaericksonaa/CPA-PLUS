@@ -2995,7 +2995,7 @@ index 01e96f05..91f5c98c 100644
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index a148dd87..bc51f822 100644
+index d486c4f7..1e09da36 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -3048,7 +3048,7 @@ index a148dd87..bc51f822 100644
  	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
  	managementRoutesRegistered atomic.Bool
  	// managementRoutesEnabled controls whether management endpoints serve real handlers.
-@@ -315,6 +342,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -316,6 +343,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	if optionState.localPassword != "" {
  		s.mgmt.SetLocalPassword(optionState.localPassword)
  	}
@@ -3063,7 +3063,7 @@ index a148dd87..bc51f822 100644
  	logDir := logging.ResolveLogDirectory(cfg)
  	s.mgmt.SetLogDirectory(logDir)
  	if optionState.postAuthHook != nil {
-@@ -331,6 +366,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -332,6 +367,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  
  	// Setup routes
  	s.setupRoutes()
@@ -3078,7 +3078,7 @@ index a148dd87..bc51f822 100644
  
  	// Register Amp module using V2 interface with Context
  	s.ampModule = ampmodule.NewLegacy(accessManager, AuthMiddleware(accessManager))
-@@ -353,7 +396,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -354,7 +397,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	// or when a local management password is provided (e.g. TUI mode).
  	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
  	s.managementRoutesEnabled.Store(hasManagementSecret)
@@ -3088,7 +3088,7 @@ index a148dd87..bc51f822 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -593,6 +637,19 @@ func (s *Server) registerManagementRoutes() {
+@@ -594,6 +638,19 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -3108,7 +3108,7 @@ index a148dd87..bc51f822 100644
  	{
  		mgmt.GET("/config", s.mgmt.GetConfig)
  		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
-@@ -750,6 +807,7 @@ func (s *Server) registerManagementRoutes() {
+@@ -751,6 +808,7 @@ func (s *Server) registerManagementRoutes() {
  		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
@@ -3116,7 +3116,7 @@ index a148dd87..bc51f822 100644
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -777,6 +835,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -778,6 +836,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -3236,7 +3236,7 @@ index a148dd87..bc51f822 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -842,6 +1013,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -865,6 +1036,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -3248,7 +3248,7 @@ index a148dd87..bc51f822 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1408,6 +1584,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1431,6 +1607,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -3263,7 +3263,7 @@ index a148dd87..bc51f822 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1518,6 +1702,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1541,6 +1725,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -3272,7 +3272,7 @@ index a148dd87..bc51f822 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1549,10 +1735,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1572,10 +1758,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -3296,7 +3296,7 @@ index a148dd87..bc51f822 100644
  	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
  		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 diff --git a/internal/api/server_test.go b/internal/api/server_test.go
-index c01dff2b..7fe6b4cb 100644
+index 3556a581..56a709eb 100644
 --- a/internal/api/server_test.go
 +++ b/internal/api/server_test.go
 @@ -1,6 +1,7 @@
@@ -3307,12 +3307,12 @@ index c01dff2b..7fe6b4cb 100644
  	"encoding/json"
  	"net/http"
  	"net/http/httptest"
-@@ -45,6 +46,51 @@ func newTestServer(t *testing.T) *Server {
- 	authManager := auth.NewManager(nil, nil, nil)
+@@ -52,7 +53,56 @@ func newTestServerWithOptions(t *testing.T, opts ...ServerOption) *Server {
  	accessManager := sdkaccess.NewManager()
  
-+	configPath := filepath.Join(tmpDir, "config.yaml")
-+	server := NewServer(cfg, authManager, accessManager, configPath)
+ 	configPath := filepath.Join(tmpDir, "config.yaml")
+-	return NewServer(cfg, authManager, accessManager, configPath, opts...)
++	server := NewServer(cfg, authManager, accessManager, configPath, opts...)
 +	t.Cleanup(func() {
 +		_ = server.Stop(context.Background())
 +	})
@@ -3356,10 +3356,16 @@ index c01dff2b..7fe6b4cb 100644
 +	authManager := auth.NewManager(nil, nil, nil)
 +	accessManager := sdkaccess.NewManager()
 +
- 	configPath := filepath.Join(tmpDir, "config.yaml")
- 	return NewServer(cfg, authManager, accessManager, configPath)
++	configPath := filepath.Join(tmpDir, "config.yaml")
++	server := NewServer(cfg, authManager, accessManager, configPath)
++	t.Cleanup(func() {
++		_ = server.Stop(context.Background())
++	})
++	return server
  }
-@@ -86,6 +132,96 @@ func TestHealthz(t *testing.T) {
+ 
+ func TestHealthz(t *testing.T) {
+@@ -92,6 +142,95 @@ func TestHealthz(t *testing.T) {
  	})
  }
  
@@ -3430,7 +3436,6 @@ index c01dff2b..7fe6b4cb 100644
 +	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
 +
 +	server := newTestServerWithPlusManagerDBPath(t, true, filepath.Join(t.TempDir(), "usage.sqlite"))
-+	defer server.Stop(context.Background())
 +
 +	req := httptest.NewRequest(http.MethodGet, "/v0/management/plus/collector/status", nil)
 +	req.Header.Set("Authorization", "Bearer test-management-key")
@@ -3453,9 +3458,9 @@ index c01dff2b..7fe6b4cb 100644
 +	}
 +}
 +
- func TestManagementUsageRequiresManagementAuthAndPopsArray(t *testing.T) {
- 	t.Setenv("MANAGEMENT_PASSWORD", "test-management-key")
- 
+ func TestNewServerWithPluginHostInjectsHandlerInterceptors(t *testing.T) {
+ 	host := pluginhost.New()
+ 	server := newTestServerWithOptions(t, WithPluginHost(host))
 diff --git a/internal/buildinfo/buildinfo.go b/internal/buildinfo/buildinfo.go
 index 0bdfaf8b..b6432c02 100644
 --- a/internal/buildinfo/buildinfo.go

@@ -12,8 +12,10 @@ SOURCE_DIR="${CPA_PLUS_OUTPUT_SOURCE:-${ROOT_DIR}/.build/out/CLIProxyAPI}"
 
 mkdir -p "${APP_DIR}/data" "${APP_DIR}/logs" "${APP_DIR}/static"
 printf "%s\n" "${PORT}" > "${APP_DIR}/PORT"
-cp "${DIST_DIR}/${BINARY_NAME}" "${APP_DIR}/cli-proxy-api"
-chmod 755 "${APP_DIR}/cli-proxy-api"
+tmp_binary="${APP_DIR}/.cli-proxy-api.new.$$"
+cp "${DIST_DIR}/${BINARY_NAME}" "${tmp_binary}"
+chmod 755 "${tmp_binary}"
+mv -f "${tmp_binary}" "${APP_DIR}/cli-proxy-api"
 cp "${SOURCE_DIR}/config.example.yaml" "${APP_DIR}/config.example.yaml"
 
 if [[ ! -f "${APP_DIR}/config.yaml" ]]; then
@@ -28,6 +30,7 @@ port=sys.argv[2]
 lines=p.read_text(errors='replace').splitlines()
 out=[]
 in_rm=False
+rm_has_disable=False
 plus_seen=False
 for line in lines:
     stripped=line.strip()
@@ -36,20 +39,26 @@ for line in lines:
         continue
     if stripped.startswith('remote-management:'):
         in_rm=True
+        rm_has_disable=False
         out.append(line)
         continue
     if in_rm and line and not line.startswith((' ', '\t')) and not stripped.startswith('#'):
-        out.append('  disable-auto-update-panel: true')
+        if not rm_has_disable:
+            out.append('  disable-auto-update-panel: true')
         in_rm=False
     if in_rm:
-        if stripped.startswith('# disable-auto-update-panel:') or stripped.startswith('disable-auto-update-panel:'):
+        if stripped.startswith('disable-auto-update-panel:'):
+            if rm_has_disable:
+                continue
             out.append('  disable-auto-update-panel: true')
+            rm_has_disable=True
             continue
     if stripped.startswith('plus-manager:'):
         plus_seen=True
     out.append(line)
 if in_rm:
-    out.append('  disable-auto-update-panel: true')
+    if not rm_has_disable:
+        out.append('  disable-auto-update-panel: true')
 text='\n'.join(out).rstrip()
 if not plus_seen:
     text += '''
