@@ -2,8 +2,8 @@ name: Auto sync upstream and release binary
 
 on:
   schedule:
-    # Every 2 days at 03:00 UTC.
-    - cron: "0 3 */2 * *"
+    # Every day at 21:00 Asia/Shanghai (13:00 UTC).
+    - cron: "0 13 * * *"
   workflow_dispatch:
     inputs:
       force_release:
