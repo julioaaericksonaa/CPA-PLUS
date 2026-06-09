@@ -1,119 +1,42 @@
-# CPA-PLUS Linux Binary Branch
+# CPA-PLUS
 
-`linux` 分支是 CPA-PLUS 的 **Linux 二进制维护分支**。
+CPA-PLUS 是把以下两个上游项目组合成 **单端口 Linux 二进制** 的维护仓库：
 
-它不维护完整上游源码，也不以 Docker 为主；它维护 patch/overlay 构建流，用于从两个上游项目自动生成并编译 Linux 二进制。
+- CLIProxyAPI：`https://github.com/router-for-me/CLIProxyAPI`
+- CPA-Manager-Plus：`https://github.com/seakee/CPA-Manager-Plus`
 
-## 分支定位
+本仓库现在只维护二进制构建流，不再以 Docker 项目为主线。
 
-```text
-main  = Docker 项目分支，适合容器部署和源码构建
-linux = Linux 二进制项目分支，适合直接运行二进制、systemd 自启动
-```
+## 项目定位
 
-本分支目标：
-
-- 生成单个 Linux 二进制：`dist/CLIProxyAPI-linux-amd64`
-- 直接运行，不依赖 Docker
-- 默认独立安装到：`/root/apps/cliproxyapi-plus`
-- 默认端口由 `PORT` 文件维护，当前为 `8317`
+- 默认分支：`main`
+- 默认端口：`8317`
+- 默认安装目录：`/root/apps/cliproxyapi-plus`
 - 面板入口：`http://host:8317/management.html`
+- 生成二进制：`dist/CLIProxyAPI-linux-amd64`
 
-
-## 最近更新：v7.1.54-plus.5
-
-- 修复服务端 Codex 定时巡检不触发：Plus 启动后后台巡检 worker 会自动运行。
-- 支持配置更新时自动启动/停止巡检 worker，按频率和按时间点配置均可由服务端后台执行。
-- 优化 worker 停止流程，更新/重启服务时避免后台任务访问已关闭的 SQLite。
-- 优化 SQLite 并发稳定性：单连接 + `busy_timeout=5000`，降低巡检、统计、面板并发访问时的锁冲突。
-- 默认端口已统一为 `8317`，面板入口为 `http://host:8317/management.html`。
-
-## 端口维护
-
-仓库根目录有端口文件：
-
-```text
-PORT
-```
-
-默认内容：
-
-```text
-8317
-```
-
-修改默认安装端口：
+## 快速安装
 
 ```bash
-echo 8317 > PORT
-```
-
-也可以安装时临时覆盖：
-
-```bash
-CPA_PLUS_PORT=8319 ./scripts/install-linux.sh --skip-tests
-```
-
-安装脚本会同步更新：
-
-```text
-/root/apps/cliproxyapi-plus/PORT
-/root/apps/cliproxyapi-plus/config.yaml
-/root/apps/cliproxyapi-plus/start-detached.sh
-/root/apps/cliproxyapi-plus/stop.sh
-/root/apps/cliproxyapi-plus/restart.sh
-```
-
-如果已经安装过，修改端口后重新执行安装或更新脚本：
-
-```bash
-./scripts/install-linux.sh --skip-tests
-# 或
-./scripts/update-linux.sh --skip-tests
-```
-
-## 构建二进制
-
-```bash
-git clone -b linux https://github.com/julioaaericksonaa/CPA-PLUS.git CPA-PLUS-linux
-cd CPA-PLUS-linux
-./scripts/build-linux-binary.sh --skip-tests
-```
-
-生成文件：
-
-```text
-dist/CLIProxyAPI-linux-amd64
-```
-
-完整生成源码位于：
-
-```text
-.build/out/CLIProxyAPI
-```
-
-## 安装到本机
-
-默认安装到 `/root/apps/cliproxyapi-plus`，端口读取 `PORT` 文件：
-
-```bash
+git clone https://github.com/julioaaericksonaa/CPA-PLUS.git
+cd CPA-PLUS
 ./scripts/install-linux.sh --skip-tests
 ```
 
-安装后编辑：
+安装后编辑本机配置：
 
-```text
-/root/apps/cliproxyapi-plus/config.yaml
+```bash
+nano /root/apps/cliproxyapi-plus/config.yaml
 ```
 
-至少设置：
+至少设置管理密钥：
 
 ```yaml
 remote-management:
   secret-key: "换成你自己的强密码"
 ```
 
-手动启动：
+启动：
 
 ```bash
 /root/apps/cliproxyapi-plus/start-detached.sh
@@ -125,204 +48,133 @@ remote-management:
 http://host:8317/management.html
 ```
 
-## 自动运行 / 开机自启
-
-安装二进制后，可安装 systemd 服务：
+## systemd 开机自启
 
 ```bash
 sudo ./scripts/install-systemd.sh
 ```
 
-默认服务名：
-
-```text
-cliproxyapi-plus.service
-```
-
-查看状态：
+常用命令：
 
 ```bash
 systemctl status cliproxyapi-plus --no-pager
-```
-
-启动：
-
-```bash
-systemctl start cliproxyapi-plus
-```
-
-停止：
-
-```bash
-systemctl stop cliproxyapi-plus
-```
-
-重启：
-
-```bash
 systemctl restart cliproxyapi-plus
-```
-
-开机自启：
-
-```bash
-systemctl enable cliproxyapi-plus
-```
-
-取消开机自启：
-
-```bash
-systemctl disable cliproxyapi-plus
-```
-
-查看日志：
-
-```bash
 journalctl -u cliproxyapi-plus -f
 ```
 
-如果你不用 systemd，也可以继续用脚本：
+## 一键更新
 
-```bash
-/root/apps/cliproxyapi-plus/start-detached.sh
-/root/apps/cliproxyapi-plus/stop.sh
-/root/apps/cliproxyapi-plus/restart.sh
-```
-
-## 更新二进制项目
-
-日常更新推荐直接使用全局命令：
+安装脚本会写入全局命令：
 
 ```bash
 update-cpa
 ```
 
-它会先拉取本仓库 `linux` 分支最新维护脚本，再同步两个上游项目，重建二进制并重启 `/root/apps/cliproxyapi-plus` 服务。
+它会执行：
 
-仓库内也可以手动执行：
+1. 拉取本仓库 `main` 分支最新维护脚本。
+2. 同步 CLIProxyAPI 和 CPA-Manager-Plus 上游。
+3. 应用 CPA-PLUS patch/overlay。
+4. 重建 Linux 二进制。
+5. 覆盖安装目录中的二进制并重启服务。
 
-```bash
-./scripts/update-linux.sh --skip-tests
-```
-
-如果已经安装了 systemd 服务，`update-linux.sh` 会自动：
-
-1. 拉取上游。
-2. 应用 CPA-PLUS patch。
-3. 构建新 Linux 二进制。
-4. 覆盖 `/root/apps/cliproxyapi-plus/cli-proxy-api`。
-5. 执行 `systemctl restart cliproxyapi-plus`。
-
-如果没有 systemd 服务，则调用：
-
-```bash
-/root/apps/cliproxyapi-plus/restart.sh
-```
-
-指定上游版本：
-
-```bash
-./scripts/update-linux.sh --cli-ref v7.1.54 --plus-ref main --skip-tests
-```
-
-自定义安装目录、服务名和端口：
-
-```bash
-CPA_PLUS_APP_DIR=/root/apps/cliproxyapi-plus \
-CPA_PLUS_SERVICE_NAME=cliproxyapi-plus \
-CPA_PLUS_PORT=8317 \
-./scripts/install-linux.sh --skip-tests
-```
-
-安装 systemd 时也使用相同变量：
-
-```bash
-CPA_PLUS_APP_DIR=/root/apps/cliproxyapi-plus \
-CPA_PLUS_SERVICE_NAME=cliproxyapi-plus \
-sudo -E ./scripts/install-systemd.sh
-```
-
-## 运行维护
-
-脚本方式启动：
-
-```bash
-/root/apps/cliproxyapi-plus/start-detached.sh
-```
-
-脚本方式停止：
-
-```bash
-/root/apps/cliproxyapi-plus/stop.sh
-```
-
-脚本方式重启：
-
-```bash
-/root/apps/cliproxyapi-plus/restart.sh
-```
-
-应用日志：
-
-```bash
-tail -f /root/apps/cliproxyapi-plus/logs/main.log
-```
-
-systemd 日志：
-
-```bash
-journalctl -u cliproxyapi-plus -f
-```
-
-数据：
+默认参数：
 
 ```text
-/root/apps/cliproxyapi-plus/data/usage.sqlite
+CPA_PLUS_REPO_DIR=/root/.config/superpowers/worktrees/CLIProxyAPI/auto
+CPA_PLUS_APP_DIR=/root/apps/cliproxyapi-plus
+CPA_PLUS_PORT=8317
+CPA_PLUS_SKIP_TESTS=1
 ```
 
-## 构建流程
+## 手动构建
 
-```text
-router-for-me/CLIProxyAPI
-  -> cpa-plus-core/prepare-source.sh
-  -> patches/cliproxyapi/*.patch
-
-seakee/CPA-Manager-Plus apps/web
-  -> cpa-plus-web/patch-plus-web-integrated.py
-  -> npm build
-  -> embedded management.html
-
-Go build
-  -> dist/CLIProxyAPI-linux-amd64
+```bash
+./scripts/build-linux-binary.sh --skip-tests
 ```
 
-## 重要文件
+生成：
 
 ```text
-PORT
-patches/cliproxyapi/0001-cpa-plus-integration.patch
-cpa-plus-core/prepare-source.sh
-cpa-plus-web/patch-plus-web-integrated.py
+dist/CLIProxyAPI-linux-amd64
+```
+
+完整临时源码：
+
+```text
+.build/out/CLIProxyAPI
+```
+
+## 自动 Release
+
+仓库包含 GitHub Actions workflow：
+
+```text
+.github/workflows/auto-sync-release.yml
+```
+
+计划任务：每 2 天自动运行一次，也可以在 GitHub Actions 页面手动运行。
+
+自动流程：
+
+1. 同步两个上游 `main`。
+2. 尝试自动刷新 CPA-PLUS patch 和上游基线文件。
+3. 构建 Linux amd64 二进制。
+4. 上游有变化时提交到 `main`。
+5. 发布版本 Release，例如：
+   `v7.1.59-plus.ba4993c6`
+6. 同时更新固定 `latest` Release。
+
+需要在 GitHub 仓库开启：
+
+```text
+Settings → Actions → General → Workflow permissions → Read and write permissions
+```
+
+workflow 使用 GitHub 自动提供的 `GITHUB_TOKEN`，不需要提交你的 PAT 或 Key。
+
+如果上游冲突、patch 失败或构建失败，workflow 会失败并停止发布，不会覆盖已有 Release。
+
+## 上游版本显示
+
+运行中的服务会在管理接口响应头中暴露上游版本：
+
+```bash
+curl -sS -D - -o /dev/null http://127.0.0.1:8317/v0/management/config | grep -Ei 'X-CPA|X-PLUS'
+```
+
+示例：
+
+```text
+X-Cpa-Upstream-Version: v7.1.59
+X-Cpa-Upstream-Commit: 44ea9abc
+X-Plus-Upstream-Version: ba4993c6
+X-Plus-Upstream-Commit: ba4993c6
+```
+
+## 目录说明
+
+```text
+cpa-plus-core/              # 从 CLIProxyAPI 上游生成集成源码
+cpa-plus-web/               # Plus 面板 patch/overlay
+patches/cliproxyapi/        # CPA-PLUS 集成 patch
 scripts/build-linux-binary.sh
 scripts/install-linux.sh
 scripts/update-linux.sh
-scripts/install-systemd.sh
+scripts/update-cpa
+scripts/ci-sync-upstream.sh # GitHub Actions 自动同步辅助脚本
 ```
 
-## 隐私安全
+## 隐私注意
 
-不要提交：
+不要提交以下文件：
 
 ```text
 config.yaml
-.env
-auths/  # 除 auths/.gitkeep
-data/
-logs/
-.build/
-dist/
-*.sqlite
-*.db
+auths/*
+data/*
+logs/*
+.env*
 *.key
 *.pem
 .codex/
@@ -330,9 +182,4 @@ dist/
 .gemini/
 ```
 
-## 来源
-
-CPA-PLUS 基于以下项目整合维护：
-
-- CLIProxyAPI：https://github.com/router-for-me/CLIProxyAPI
-- CPA-Manager-Plus：https://github.com/seakee/CPA-Manager-Plus
+这些已在 `.gitignore` 中排除。

@@ -5,12 +5,12 @@ usage() {
   cat <<USAGE
 Usage: update-cpa [build options]
 
-Pull the CPA-PLUS linux maintenance branch, sync upstream CLIProxyAPI and
+Pull the CPA-PLUS binary maintenance branch, sync upstream CLIProxyAPI and
 CPA-Manager-Plus, rebuild the Linux binary, install it to /root/apps/cliproxyapi-plus,
 and restart the service on port 8317.
 
 Environment:
-  CPA_PLUS_REPO_DIR      Local linux branch checkout. Default: /root/.config/superpowers/worktrees/CLIProxyAPI/auto
+  CPA_PLUS_REPO_DIR      Local CPA-PLUS checkout. Default: /root/.config/superpowers/worktrees/CLIProxyAPI/auto
   CPA_PLUS_APP_DIR       Install directory. Default: /root/apps/cliproxyapi-plus
   CPA_PLUS_PORT          Service port. Default: 8317
   CPA_PLUS_SKIP_TESTS    Default: 1
@@ -25,13 +25,13 @@ case "${1:-}" in
 esac
 
 REPO_DIR="${CPA_PLUS_REPO_DIR:-/root/.config/superpowers/worktrees/CLIProxyAPI/auto}"
-BRANCH="${CPA_PLUS_BRANCH:-linux}"
+BRANCH="${CPA_PLUS_BRANCH:-main}"
 APP_DIR="${CPA_PLUS_APP_DIR:-/root/apps/cliproxyapi-plus}"
 PORT="${CPA_PLUS_PORT:-8317}"
 
 if [[ ! -d "${REPO_DIR}/.git" && ! -f "${REPO_DIR}/.git" ]]; then
   echo "CPA-PLUS linux repository not found: ${REPO_DIR}" >&2
-  echo "Set CPA_PLUS_REPO_DIR to your local CPA-PLUS linux branch checkout." >&2
+  echo "Set CPA_PLUS_REPO_DIR to your local CPA-PLUS checkout." >&2
   exit 1
 fi
 
@@ -39,7 +39,7 @@ cd "${REPO_DIR}"
 
 echo "==> Updating CPA-PLUS maintenance branch (${BRANCH})"
 git fetch origin "${BRANCH}"
-git checkout "${BRANCH}"
+git checkout --detach "origin/${BRANCH}"
 git reset --hard "origin/${BRANCH}"
 
 echo "==> Building from upstream and restarting CPA-PLUS"

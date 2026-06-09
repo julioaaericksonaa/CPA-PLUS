@@ -143,7 +143,7 @@ plus_upstream_version() {
 }
 
 cat > "${OUT_DIR}/.cpa-plus-auto-build.env" <<META
-CPA_PLUS_BRANCH=linux
+CPA_PLUS_BRANCH=main
 CLI_UPSTREAM_REPO=${CLI_REPO}
 CLI_UPSTREAM_REF=${CLI_REF}
 CLI_UPSTREAM_VERSION=$(cli_upstream_version)

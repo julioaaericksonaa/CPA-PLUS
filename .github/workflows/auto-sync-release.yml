@@ -1,0 +1,144 @@
+name: Auto sync upstream and release binary
+
+on:
+  schedule:
+    # Every 2 days at 03:00 UTC.
+    - cron: "0 3 */2 * *"
+  workflow_dispatch:
+    inputs:
+      force_release:
+        description: "Build and refresh releases even when upstream metadata did not change"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cpa-plus-auto-sync-release
+  cancel-in-progress: false
+
+jobs:
+  sync-build-release:
+    runs-on: ubuntu-24.04
+    env:
+      FORCE_RELEASE: ${{ github.event.inputs.force_release || 'false' }}
+      CPA_PLUS_SKIP_TESTS: "1"
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rsync build-essential pkg-config
+
+      - name: Configure git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync upstream metadata and patch
+        id: sync
+        run: |
+          ./scripts/ci-sync-upstream.sh
+
+      - name: Decide whether to build and release
+        id: changes
+        run: |
+          if git diff --quiet -- CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE CPA_PLUS_SOURCE_COMMIT patches/cliproxyapi/0001-cpa-plus-integration.patch; then
+            changed=false
+          else
+            changed=true
+          fi
+          should_release=false
+          if [[ "${changed}" == "true" || "${FORCE_RELEASE}" == "true" ]]; then
+            should_release=true
+          fi
+          echo "changed=${changed}" >> "${GITHUB_OUTPUT}"
+          echo "should_release=${should_release}" >> "${GITHUB_OUTPUT}"
+          echo "changed=${changed} should_release=${should_release}"
+
+      - name: Stop when nothing changed
+        if: steps.changes.outputs.should_release != 'true'
+        run: |
+          echo "No upstream metadata change detected; release skipped."
+
+      - name: Build Linux amd64 binary
+        if: steps.changes.outputs.should_release == 'true'
+        run: |
+          ./scripts/build-linux-binary.sh --skip-tests
+          sha256sum dist/CLIProxyAPI-linux-amd64 > dist/CLIProxyAPI-linux-amd64.sha256
+
+      - name: Commit refreshed patch and metadata
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git add CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE CPA_PLUS_SOURCE_COMMIT patches/cliproxyapi/0001-cpa-plus-integration.patch
+          git commit -m "chore: sync upstream ${{ steps.sync.outputs.cli_version }} plus ${{ steps.sync.outputs.plus_version }}"
+          git push origin HEAD:main
+
+      - name: Prepare release metadata
+        if: steps.changes.outputs.should_release == 'true'
+        id: release_meta
+        run: |
+          tag="${{ steps.sync.outputs.cli_version }}-plus.${{ steps.sync.outputs.plus_version }}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+          cat > release-notes.md <<NOTES
+          CPA-PLUS binary release
+
+          - CLIProxyAPI upstream version: ${{ steps.sync.outputs.cli_version }}
+          - CLIProxyAPI upstream commit: ${{ steps.sync.outputs.cli_commit }}
+          - CPA-Manager-Plus upstream version: ${{ steps.sync.outputs.plus_version }}
+          - CPA-Manager-Plus upstream commit: ${{ steps.sync.outputs.plus_commit }}
+          - Binary: CLIProxyAPI-linux-amd64
+
+          Download and run on Linux amd64. The bundled Plus panel is served at /management.html.
+          NOTES
+
+      - name: Publish versioned release
+        if: steps.changes.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release_meta.outputs.tag }}
+        run: |
+          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git tag "${TAG}" HEAD
+            git push origin "refs/tags/${TAG}"
+          fi
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 --clobber
+          else
+            gh release create "${TAG}" dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 \
+              --title "CPA-PLUS ${TAG}" \
+              --notes-file release-notes.md
+          fi
+
+      - name: Refresh fixed latest release
+        if: steps.changes.outputs.should_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag >/dev/null 2>&1 || true
+          git tag -f latest HEAD
+          git push origin refs/tags/latest --force
+          gh release create latest dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 \
+            --title "CPA-PLUS latest" \
+            --notes-file release-notes.md \
+            --latest
