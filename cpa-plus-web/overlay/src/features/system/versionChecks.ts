@@ -7,7 +7,15 @@ export type UpstreamVersionState = 'unknown' | 'latest' | 'update' | 'older';
 
 export const readManagerLatestTag = (data: ManagerLatestRelease | VersionPayload): string => {
   if (!data) return '';
-  const raw = data.sha ?? data.tag_name ?? data.name ?? data.latest_version ?? data.latest;
+  const raw =
+    data.sha ??
+    data['latest-commit'] ??
+    data.latest_commit ??
+    data.tag_name ??
+    data.name ??
+    data['latest-version'] ??
+    data.latest_version ??
+    data.latest;
   const value = typeof raw === 'string' ? raw : raw == null ? '' : String(raw);
   return value.length > 8 && /^[0-9a-f]{9,}$/i.test(value) ? value.slice(0, 8) : value;
 };

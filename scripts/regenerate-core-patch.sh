@@ -15,6 +15,15 @@ mkdir -p "$(dirname "${OUT_PATCH}")"
 (
   cd "${SOURCE_REPO}"
   git diff --binary "${BASE_REF}..HEAD" -- . \
+    ':(exclude).github/**' \
+    ':(exclude)README.md' \
+    ':(exclude)README_CN.md' \
+    ':(exclude)README_JA.md' \
+    ':(exclude)Dockerfile' \
+    ':(exclude)docker-compose.yml' \
+    ':(exclude)docs/**' \
+    ':(exclude)scripts/**' \
+    ':(exclude)test/**' \
     ':(exclude)web/manager-plus/**' \
     ':(exclude)docs/superpowers/**'
 ) > "${OUT_PATCH}"

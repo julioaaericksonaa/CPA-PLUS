@@ -77,6 +77,12 @@ tail -f /root/apps/cliproxyapi-plus/logs/cliproxyapi-plus.nohup.log
 curl -sS -D - -o /dev/null http://127.0.0.1:8317/v0/management/config | grep -Ei 'X-CPA|X-PLUS'
 ```
 
+系统概览里的版本含义：
+
+- 管理面板版本：构建时打包的 CPA-Manager-Plus 上游版本/commit。
+- 服务端版本：构建时打包的 CLIProxyAPI 上游版本。
+- 点刷新检查更新时，面板只请求本机管理接口；服务端再去查询上游，避免浏览器直连 GitHub API 触发 403。
+
 ---
 
 ## 默认配置说明
@@ -154,12 +160,13 @@ cron: 0 13 * * *
 
 自动流程：
 
-1. 拉取 CLIProxyAPI 上游 `main`。
-2. 拉取 CPA-Manager-Plus 上游 `main`。
-3. 应用 CPA-PLUS 集成 patch。
+1. 先轻量检测两个上游 `main` 的最新 commit。
+2. 如果 CLIProxyAPI 和 CPA-Manager-Plus 都没有更新，直接停止，不安装环境、不构建、不发布。
+3. 如果任意一个上游有更新，再拉取上游、应用 CPA-PLUS 集成 patch。
 4. 在 Ubuntu 22.04 构建 Linux amd64 二进制，降低 glibc 兼容性要求。
-5. 发布版本 Release，例如 `v7.1.59-plus.ba4993c6`。
-6. 原地刷新固定 Release：`latest`（不再 delete/recreate，降低短暂 404 风险）。
+5. 提交更新后的上游元数据和 patch 到 `main`。
+6. 只刷新固定 Release：`latest`。
+7. 删除所有旧 Release 和非 `latest` tag，仓库只保留最新版 `latest` Release。
 
 日常使用只关心：
 

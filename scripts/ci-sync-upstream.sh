@@ -20,6 +20,15 @@ mkdir -p "$(dirname "${PATCH_FILE}")"
 (
   cd "${OUT_DIR}"
   git diff --binary --cached HEAD -- . \
+    ':(exclude).github/**' \
+    ':(exclude)README.md' \
+    ':(exclude)README_CN.md' \
+    ':(exclude)README_JA.md' \
+    ':(exclude)Dockerfile' \
+    ':(exclude)docker-compose.yml' \
+    ':(exclude)docs/**' \
+    ':(exclude)scripts/**' \
+    ':(exclude)test/**' \
     ':(exclude)web/manager-plus/**' \
     ':(exclude)docs/superpowers/**'
 ) > "${PATCH_FILE}"

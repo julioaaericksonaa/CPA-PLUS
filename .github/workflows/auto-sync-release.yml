@@ -5,15 +5,6 @@ on:
     # Every day at 21:00 Asia/Shanghai (13:00 UTC).
     - cron: "0 13 * * *"
   workflow_dispatch:
-    inputs:
-      force_release:
-        description: "Build and refresh releases even when upstream metadata did not change"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 permissions:
   contents: write
@@ -26,7 +17,6 @@ jobs:
   sync-build-release:
     runs-on: ubuntu-22.04
     env:
-      FORCE_RELEASE: ${{ github.event.inputs.force_release || 'false' }}
       CPA_PLUS_SKIP_TESTS: "1"
     steps:
       - name: Checkout main
@@ -35,73 +25,104 @@ jobs:
           ref: main
           fetch-depth: 0
 
+      - name: Detect upstream changes
+        id: upstream
+        run: |
+          current_cli="$(cat CLI_UPSTREAM_BASE 2>/dev/null || true)"
+          current_plus="$(cat PLUS_UPSTREAM_BASE 2>/dev/null || true)"
+          latest_cli="$(git ls-remote https://github.com/router-for-me/CLIProxyAPI.git refs/heads/main | awk '{print $1}')"
+          latest_plus="$(git ls-remote https://github.com/seakee/CPA-Manager-Plus.git refs/heads/main | awk '{print $1}')"
+
+          if [[ -z "${latest_cli}" || -z "${latest_plus}" ]]; then
+            echo "failed to query upstream commits" >&2
+            exit 1
+          fi
+
+          cli_changed=false
+          plus_changed=false
+          if [[ "${current_cli}" != "${latest_cli}" ]]; then
+            cli_changed=true
+          fi
+          if [[ "${current_plus}" != "${latest_plus}" ]]; then
+            plus_changed=true
+          fi
+
+          should_sync=false
+          if [[ "${cli_changed}" == "true" || "${plus_changed}" == "true" ]]; then
+            should_sync=true
+          fi
+
+          {
+            echo "current_cli=${current_cli}"
+            echo "latest_cli=${latest_cli}"
+            echo "current_plus=${current_plus}"
+            echo "latest_plus=${latest_plus}"
+            echo "cli_changed=${cli_changed}"
+            echo "plus_changed=${plus_changed}"
+            echo "should_sync=${should_sync}"
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "CLIProxyAPI current=${current_cli} latest=${latest_cli} changed=${cli_changed}"
+          echo "CPA-Manager-Plus current=${current_plus} latest=${latest_plus} changed=${plus_changed}"
+          echo "should_sync=${should_sync}"
+
+      - name: Stop when no upstream changed
+        if: steps.upstream.outputs.should_sync != 'true'
+        run: |
+          echo "No upstream change detected; sync/build/release skipped."
+
       - name: Setup Go
+        if: steps.upstream.outputs.should_sync == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
 
       - name: Setup Node.js
+        if: steps.upstream.outputs.should_sync == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "24"
 
       - name: Install system dependencies
+        if: steps.upstream.outputs.should_sync == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rsync build-essential pkg-config
 
       - name: Configure git author
+        if: steps.upstream.outputs.should_sync == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       - name: Sync upstream metadata and patch
+        if: steps.upstream.outputs.should_sync == 'true'
         id: sync
         run: |
           ./scripts/ci-sync-upstream.sh
 
-      - name: Decide whether to build and release
-        id: changes
-        run: |
-          if git diff --quiet -- CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE patches/cliproxyapi/0001-cpa-plus-integration.patch; then
-            changed=false
-          else
-            changed=true
-          fi
-          should_release=false
-          if [[ "${changed}" == "true" || "${FORCE_RELEASE}" == "true" ]]; then
-            should_release=true
-          fi
-          echo "changed=${changed}" >> "${GITHUB_OUTPUT}"
-          echo "should_release=${should_release}" >> "${GITHUB_OUTPUT}"
-          echo "changed=${changed} should_release=${should_release}"
-
-      - name: Stop when nothing changed
-        if: steps.changes.outputs.should_release != 'true'
-        run: |
-          echo "No upstream metadata change detected; release skipped."
-
       - name: Build Linux amd64 binary
-        if: steps.changes.outputs.should_release == 'true'
+        if: steps.upstream.outputs.should_sync == 'true'
         run: |
           ./scripts/build-linux-binary.sh --skip-tests
           sha256sum dist/CLIProxyAPI-linux-amd64 > dist/CLIProxyAPI-linux-amd64.sha256
 
       - name: Commit refreshed patch and metadata
-        if: steps.changes.outputs.changed == 'true'
+        if: steps.upstream.outputs.should_sync == 'true'
         run: |
           git add CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE patches/cliproxyapi/0001-cpa-plus-integration.patch
-          git commit -m "chore: sync upstream ${{ steps.sync.outputs.cli_version }} plus ${{ steps.sync.outputs.plus_version }}"
-          git push origin HEAD:main
+          if git diff --cached --quiet; then
+            echo "No metadata or patch diff after upstream sync."
+          else
+            git commit -m "chore: sync upstream ${{ steps.sync.outputs.cli_version }} plus ${{ steps.sync.outputs.plus_version }}"
+            git push origin HEAD:main
+          fi
 
       - name: Prepare release metadata
-        if: steps.changes.outputs.should_release == 'true'
-        id: release_meta
+        if: steps.upstream.outputs.should_sync == 'true'
         run: |
-          tag="${{ steps.sync.outputs.cli_version }}-plus.${{ steps.sync.outputs.plus_version }}"
-          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
           cat > release-notes.md <<NOTES
-          CPA-PLUS binary release
+          CPA-PLUS latest binary release
 
           - CLIProxyAPI upstream version: ${{ steps.sync.outputs.cli_version }}
           - CLIProxyAPI upstream commit: ${{ steps.sync.outputs.cli_commit }}
@@ -113,26 +134,8 @@ jobs:
           Download and run on Linux amd64. The bundled Plus panel is served at /management.html.
           NOTES
 
-      - name: Publish versioned release
-        if: steps.changes.outputs.should_release == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ steps.release_meta.outputs.tag }}
-        run: |
-          if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            git tag "${TAG}" HEAD
-            git push origin "refs/tags/${TAG}"
-          fi
-          if gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release upload "${TAG}" dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 --clobber
-          else
-            gh release create "${TAG}" dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 \
-              --title "CPA-PLUS ${TAG}" \
-              --notes-file release-notes.md
-          fi
-
       - name: Refresh fixed latest release
-        if: steps.changes.outputs.should_release == 'true'
+        if: steps.upstream.outputs.should_sync == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -150,3 +153,24 @@ jobs:
               --notes-file release-notes.md \
               --latest
           fi
+
+      - name: Delete old releases and tags
+        if: steps.upstream.outputs.should_sync == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 1000 --json tagName --jq '.[].tagName' | while read -r tag; do
+            if [[ -z "${tag}" || "${tag}" == "latest" ]]; then
+              continue
+            fi
+            echo "Deleting old release: ${tag}"
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done
+
+          git ls-remote --tags origin | awk '$2 !~ /\^\{\}$/ {sub("refs/tags/", "", $2); print $2}' | while read -r tag; do
+            if [[ -z "${tag}" || "${tag}" == "latest" ]]; then
+              continue
+            fi
+            echo "Deleting old tag: ${tag}"
+            git push origin ":refs/tags/${tag}" || true
+          done

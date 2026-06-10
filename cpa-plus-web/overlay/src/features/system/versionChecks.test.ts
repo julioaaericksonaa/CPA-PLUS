@@ -6,6 +6,10 @@ describe('versionChecks', () => {
     expect(readManagerLatestTag({ sha: '5ee6e23abcdef1234567890' })).toBe('5ee6e23a');
   });
 
+  it('reads integrated Manager latest-version payload', () => {
+    expect(readManagerLatestTag({ 'latest-version': 'f2301ac8' })).toBe('f2301ac8');
+  });
+
   it('reads CLIProxyAPI latest release version', () => {
     expect(readApiLatestVersion({ 'latest-version': 'v7.1.55' })).toBe('v7.1.55');
   });
