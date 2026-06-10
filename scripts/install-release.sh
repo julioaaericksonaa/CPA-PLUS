@@ -2,13 +2,14 @@
 set -euo pipefail
 
 REPO="${CPA_PLUS_REPO:-julioaaericksonaa/CPA-PLUS}"
-REF="${CPA_PLUS_INSTALL_REF:-main}"
+REF="${CPA_PLUS_INSTALL_REF:-latest}"
 RELEASE="${CPA_PLUS_RELEASE:-latest}"
 APP_DIR="${CPA_PLUS_APP_DIR:-/root/apps/cliproxyapi-plus}"
 PORT="${CPA_PLUS_PORT:-8317}"
 BINARY_NAME="${CPA_PLUS_BINARY_NAME:-CLIProxyAPI-linux-amd64}"
 START_SERVICE="${CPA_PLUS_START:-1}"
 FORCE_CONFIG="${CPA_PLUS_FORCE_CONFIG:-0}"
+PUBLIC_ACCESS="${CPA_PLUS_PUBLIC:-0}"
 INSTALL_SYSTEMD="${CPA_PLUS_SYSTEMD:-auto}"
 INSTALL_UPDATE_CMD="${CPA_PLUS_INSTALL_UPDATE_CMD:-1}"
 SERVICE_NAME="${CPA_PLUS_SERVICE_NAME:-cliproxyapi-plus}"
@@ -25,24 +26,36 @@ Options:
   --release TAG       Release tag. Default: ${RELEASE}
   --repo OWNER/REPO   GitHub repo. Default: ${REPO}
   --no-start          Download/install only, do not start service
+  --public            Bind 0.0.0.0 and allow remote management
   --force-config      Regenerate config.yaml and backup old config
   -h, --help          Show this help
 
 Environment:
   CPA_PLUS_MANAGEMENT_KEY   Management panel key; generated when empty
   CPA_PLUS_API_KEY          Client API key; generated when empty
+  CPA_PLUS_PUBLIC           1 to bind all interfaces. Default: 0
   CPA_PLUS_SYSTEMD          auto, 1, or 0. Default: auto
   CPA_PLUS_INSTALL_UPDATE_CMD 1 or 0. Default: 1
 USAGE
 }
 
+require_value() {
+  local opt="$1"
+  local value="${2:-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    echo "${opt} requires a value" >&2
+    exit 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --app-dir) APP_DIR="$2"; shift 2 ;;
-    --port) PORT="$2"; shift 2 ;;
-    --release) RELEASE="$2"; shift 2 ;;
-    --repo) REPO="$2"; shift 2 ;;
+    --app-dir) require_value "$1" "${2:-}"; APP_DIR="$2"; shift 2 ;;
+    --port) require_value "$1" "${2:-}"; PORT="$2"; shift 2 ;;
+    --release) require_value "$1" "${2:-}"; RELEASE="$2"; shift 2 ;;
+    --repo) require_value "$1" "${2:-}"; REPO="$2"; shift 2 ;;
     --no-start) START_SERVICE=0; shift ;;
+    --public|--allow-remote) PUBLIC_ACCESS=1; shift ;;
     --force-config) FORCE_CONFIG=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
@@ -62,7 +75,15 @@ rand_hex() {
 }
 
 shell_quote() {
-  printf "%s" "$1" | sed "s/'/'\\''/g; 1s/^/'/; \$s/\$/'/"
+  printf "%q" "$1"
+}
+
+systemd_quote() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//%/%%}"
+  printf '"%s"' "$value"
 }
 
 need_cmd() {
@@ -75,11 +96,29 @@ need_cmd chmod
 need_cmd mkdir
 need_cmd mv
 need_cmd cp
+need_cmd install
+need_cmd date
 
 if [[ ! "$PORT" =~ ^[0-9]+$ ]]; then
   echo "Invalid port: $PORT" >&2
   exit 1
 fi
+if (( PORT < 1 || PORT > 65535 )); then
+  echo "Invalid port range: $PORT" >&2
+  exit 1
+fi
+if [[ "$PUBLIC_ACCESS" != "0" && "$PUBLIC_ACCESS" != "1" ]]; then
+  echo "Invalid CPA_PLUS_PUBLIC: $PUBLIC_ACCESS (expected 0 or 1)" >&2
+  exit 1
+fi
+
+panel_url() {
+  if [[ "$PUBLIC_ACCESS" == "1" ]]; then
+    printf 'http://host:%s/management.html' "$PORT"
+  else
+    printf 'http://127.0.0.1:%s/management.html' "$PORT"
+  fi
+}
 
 download_release() {
   local tmp="$1"
@@ -107,13 +146,20 @@ write_config_template() {
   local path="$1"
   local management_key="$2"
   local api_key="$3"
+  local bind_host="127.0.0.1"
+  local allow_remote="false"
+  if [[ "$PUBLIC_ACCESS" == "1" ]]; then
+    bind_host=""
+    allow_remote="true"
+  fi
 
   cat > "$path" <<YAML
 # CPA-PLUS 默认配置：单端口 API + Plus 面板
-# 面板：http://host:${PORT}/management.html
+# 面板：$(panel_url)
 # 首次安装会自动生成 management key 和 api key，并保存到 ${APP_DIR}/secrets.env
+# 默认仅监听 127.0.0.1；如需公网直连安装时加 --public。
 
-host: ""
+host: "${bind_host}"
 port: ${PORT}
 
 tls:
@@ -122,8 +168,8 @@ tls:
   key: ""
 
 remote-management:
-  # true：允许从浏览器远程访问面板；请务必保管好 secret-key。
-  allow-remote: true
+  # true：允许非 localhost 访问管理接口；公网直连时请务必保管好 secret-key。
+  allow-remote: ${allow_remote}
   secret-key: "${management_key}"
   disable-control-panel: false
   # CPA-PLUS 已内置 Plus 面板，关闭上游旧面板自动更新。
@@ -239,8 +285,14 @@ write_runtime_scripts() {
 #!/usr/bin/env bash
 set -euo pipefail
 APP=$(shell_quote "$APP_DIR")
+SERVICE=$(shell_quote "$SERVICE_NAME")
 cd "\$APP"
 mkdir -p "\$APP/logs" "\$APP/data"
+if [[ "\$(cat "\$APP/runtime-mode" 2>/dev/null || true)" == "systemd" ]]; then
+  systemctl start "\$SERVICE"
+  echo "CPA-PLUS started by systemd: $(panel_url)"
+  exit 0
+fi
 if [[ -f "\$APP/cliproxyapi-plus.pid" ]]; then
   old_pid=\$(cat "\$APP/cliproxyapi-plus.pid" 2>/dev/null || true)
   if [[ -n "\$old_pid" ]] && kill -0 "\$old_pid" 2>/dev/null; then
@@ -253,13 +305,19 @@ echo \$! > "\$APP/cliproxyapi-plus.pid"
 sleep 1
 LISTEN_PID=\$(ss -ltnp 2>/dev/null | awk '/:${PORT} / {print}' | sed -n 's/.*pid=\\([0-9]*\\).*/\\1/p' | head -n1 || true)
 if [[ -n "\$LISTEN_PID" ]]; then echo "\$LISTEN_PID" > "\$APP/cliproxyapi-plus.pid"; fi
-echo "CPA-PLUS started: http://host:${PORT}/management.html"
+echo "CPA-PLUS started: $(panel_url)"
 EOF
 
   cat > "$APP_DIR/stop.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 APP=$(shell_quote "$APP_DIR")
+SERVICE=$(shell_quote "$SERVICE_NAME")
+if [[ "\$(cat "\$APP/runtime-mode" 2>/dev/null || true)" == "systemd" ]]; then
+  systemctl stop "\$SERVICE"
+  echo "CPA-PLUS stopped by systemd"
+  exit 0
+fi
 PID_FILE="\$APP/cliproxyapi-plus.pid"
 if [[ -f "\$PID_FILE" ]]; then
   pid=\$(cat "\$PID_FILE" 2>/dev/null || true)
@@ -280,6 +338,12 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 APP=$(shell_quote "$APP_DIR")
+SERVICE=$(shell_quote "$SERVICE_NAME")
+if [[ "\$(cat "\$APP/runtime-mode" 2>/dev/null || true)" == "systemd" ]]; then
+  systemctl restart "\$SERVICE"
+  echo "CPA-PLUS restarted by systemd: $(panel_url)"
+  exit 0
+fi
 "\$APP/stop.sh" || true
 sleep 1
 "\$APP/start-detached.sh"
@@ -289,6 +353,11 @@ EOF
 #!/usr/bin/env bash
 set -euo pipefail
 APP=$(shell_quote "$APP_DIR")
+SERVICE=$(shell_quote "$SERVICE_NAME")
+if [[ "\$(cat "\$APP/runtime-mode" 2>/dev/null || true)" == "systemd" ]]; then
+  systemctl status "\$SERVICE" --no-pager
+  exit \$?
+fi
 if [[ -f "\$APP/cliproxyapi-plus.pid" ]]; then
   pid=\$(cat "\$APP/cliproxyapi-plus.pid" 2>/dev/null || true)
   if [[ -n "\$pid" ]] && kill -0 "\$pid" 2>/dev/null; then
@@ -319,8 +388,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=${APP_DIR}
-ExecStart=${APP_DIR}/cli-proxy-api -config ${APP_DIR}/config.yaml
+WorkingDirectory=$(systemd_quote "$APP_DIR")
+ExecStart=$(systemd_quote "$APP_DIR/cli-proxy-api") -config $(systemd_quote "$APP_DIR/config.yaml")
 Restart=always
 RestartSec=3
 LimitNOFILE=1048576
@@ -345,6 +414,10 @@ export CPA_PLUS_RELEASE="\${CPA_PLUS_RELEASE:-latest}"
 if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
   gh api "repos/\${CPA_PLUS_REPO}/contents/scripts/install-release.sh?ref=\${CPA_PLUS_INSTALL_REF}" --jq .content | base64 -d | bash -s -- "\$@"
 else
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "Missing curl. Install curl or login with GitHub CLI: gh auth login" >&2
+    exit 1
+  fi
   curl -fsSL "https://raw.githubusercontent.com/\${CPA_PLUS_REPO}/\${CPA_PLUS_INSTALL_REF}/scripts/install-release.sh" | bash -s -- "\$@"
 fi
 EOF
@@ -387,7 +460,11 @@ cp -f "$TMP_DIR/$BINARY_NAME.sha256" "$APP_DIR/cli-proxy-api.sha256"
 write_config_example "$APP_DIR/config.example.yaml"
 CONFIG_CREATED=0
 if [[ "$FORCE_CONFIG" == "1" && -f "$APP_DIR/config.yaml" ]]; then
-  cp -p "$APP_DIR/config.yaml" "$APP_DIR/config.yaml.bak.$(date +%Y%m%d%H%M%S)"
+  backup_ts="$(date +%Y%m%d%H%M%S)"
+  cp -p "$APP_DIR/config.yaml" "$APP_DIR/config.yaml.bak.${backup_ts}"
+  if [[ -f "$APP_DIR/secrets.env" ]]; then
+    cp -p "$APP_DIR/secrets.env" "$APP_DIR/secrets.env.bak.${backup_ts}"
+  fi
   rm -f "$APP_DIR/config.yaml"
 fi
 
@@ -399,7 +476,7 @@ if [[ ! -f "$APP_DIR/config.yaml" ]]; then
   cat > "$APP_DIR/secrets.env" <<EOF
 CPA_PLUS_MANAGEMENT_KEY=$(shell_quote "$MANAGEMENT_KEY")
 CPA_PLUS_API_KEY=$(shell_quote "$API_KEY")
-CPA_PLUS_PANEL_URL=$(shell_quote "http://host:${PORT}/management.html")
+CPA_PLUS_PANEL_URL=$(shell_quote "$(panel_url)")
 EOF
   chmod 600 "$APP_DIR/secrets.env"
   CONFIG_CREATED=1
@@ -408,6 +485,7 @@ else
 fi
 
 write_runtime_scripts
+printf 'background\n' > "$APP_DIR/runtime-mode"
 if [[ "$INSTALL_UPDATE_CMD" == "1" ]]; then
   write_update_command
 fi
@@ -415,6 +493,7 @@ fi
 if [[ "$START_SERVICE" == "1" ]]; then
   if [[ "$INSTALL_SYSTEMD" == "1" || "$INSTALL_SYSTEMD" == "auto" ]]; then
     if systemd_usable && install_systemd_service; then
+      printf 'systemd\n' > "$APP_DIR/runtime-mode"
       "$APP_DIR/stop.sh" >/dev/null 2>&1 || true
       log "Starting by systemd"
       systemctl restart "$SERVICE_NAME"
@@ -433,11 +512,11 @@ fi
 
 echo
 echo "CPA-PLUS ready"
-echo "Panel:  http://host:${PORT}/management.html"
+echo "Panel:  $(panel_url)"
 echo "Config: ${APP_DIR}/config.yaml"
 echo "Update: update-cpa"
 echo "Logs:   ${APP_DIR}/logs/cliproxyapi-plus.nohup.log"
 if [[ "$CONFIG_CREATED" == "1" ]]; then
   echo "Keys:   ${APP_DIR}/secrets.env"
-  echo "Management key: ${MANAGEMENT_KEY}"
+  echo "Management key saved in ${APP_DIR}/secrets.env"
 fi

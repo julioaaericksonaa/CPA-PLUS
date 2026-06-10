@@ -3,7 +3,7 @@
 CPA-PLUS = CLIProxyAPI + CPA-Manager-Plus，一份 Linux 二进制、一个端口、一个 Plus 面板。
 
 ```text
-http://host:8317/management.html
+http://127.0.0.1:8317/management.html
 ```
 
 本仓库只维护 `main` 分支；GitHub Actions 每天北京时间 21:00 自动同步两个上游并刷新 `latest` Release。
@@ -12,10 +12,16 @@ http://host:8317/management.html
 
 ## 一句话安装
 
-私有仓库推荐先登录 GitHub CLI，然后一条命令安装并启动：
+私有仓库推荐先登录 GitHub CLI，然后一条命令安装并启动（默认只监听本机 127.0.0.1）：
 
 ```bash
-gh auth login && gh api repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main --jq .content | base64 -d | bash
+gh auth login && gh api "repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main" --jq .content | base64 -d | bash
+```
+
+如果你明确要公网直连 `http://host:8317/management.html`，加 `--public`：
+
+```bash
+gh auth login && gh api "repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main" --jq .content | base64 -d | bash -s -- --public
 ```
 
 如果仓库改为公开，也可以：
@@ -29,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/julioaaericksonaa/CPA-PLUS/main/scr
 安装完成后只需要记住：
 
 ```text
-面板：http://host:8317/management.html
+面板：http://127.0.0.1:8317/management.html（公网模式为 http://host:8317/management.html）
 配置：/root/apps/cliproxyapi-plus/config.yaml
 密钥：/root/apps/cliproxyapi-plus/secrets.env
 更新：update-cpa
@@ -43,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/julioaaericksonaa/CPA-PLUS/main/scr
 update-cpa
 ```
 
-`update-cpa` 会下载最新已发布的 `latest` Release，保留你的 `config.yaml`、`data/`、`logs/`，只替换二进制并重启服务。
+`update-cpa` 默认从 `latest` tag 拉取安装脚本、下载最新已发布的 `latest` Release，保留你的 `config.yaml`、`data/`、`logs/`，只替换二进制并重启服务。
 
 > 以后主要看 Release，不需要自己本机构建：Actions 每天 21:00 自动拉取上游、合并、构建、发布。
 
@@ -85,6 +91,7 @@ curl -sS -D - -o /dev/null http://127.0.0.1:8317/v0/management/config | grep -Ei
 
 默认配置包含：
 
+- `host: "127.0.0.1"` 和 `remote-management.allow-remote: false`：默认只允许本机访问；公网直连请用 `--public` 或手动改配置。
 - `remote-management`：Plus 面板管理密钥，默认自动生成强密钥。
 - `api-keys`：客户端调用本代理用的 API key，默认自动生成。
 - `plus-manager`：统计、巡检、历史记录默认开启。
@@ -101,7 +108,7 @@ nano /root/apps/cliproxyapi-plus/config.yaml
 重新生成配置会备份旧配置：
 
 ```bash
-gh api repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main --jq .content | base64 -d | bash -s -- --force-config
+gh api "repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main" --jq .content | base64 -d | bash -s -- --force-config
 ```
 
 ---
@@ -110,19 +117,22 @@ gh api repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=
 
 ```bash
 # 指定端口
-gh api repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main --jq .content | base64 -d | CPA_PLUS_PORT=8318 bash
+gh api "repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main" --jq .content | base64 -d | CPA_PLUS_PORT=8318 bash
 
 # 指定目录
-gh api repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main --jq .content | base64 -d | CPA_PLUS_APP_DIR=/root/apps/cpa-test bash
+gh api "repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main" --jq .content | base64 -d | CPA_PLUS_APP_DIR=/root/apps/cpa-test bash
+
+# 公网直连模式
+gh api "repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main" --jq .content | base64 -d | bash -s -- --public
 
 # 只安装不启动
-gh api repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main --jq .content | base64 -d | bash -s -- --no-start
+gh api "repos/julioaaericksonaa/CPA-PLUS/contents/scripts/install-release.sh?ref=main" --jq .content | base64 -d | bash -s -- --no-start
 ```
 
 脚本参数也可以这样写：
 
 ```bash
-bash scripts/install-release.sh --port 8318 --app-dir /root/apps/cpa-test
+bash scripts/install-release.sh --port 8318 --app-dir /root/apps/cpa-test --public
 ```
 
 ---
@@ -147,9 +157,9 @@ cron: 0 13 * * *
 1. 拉取 CLIProxyAPI 上游 `main`。
 2. 拉取 CPA-Manager-Plus 上游 `main`。
 3. 应用 CPA-PLUS 集成 patch。
-4. 构建 Linux amd64 二进制。
+4. 在 Ubuntu 22.04 构建 Linux amd64 二进制，降低 glibc 兼容性要求。
 5. 发布版本 Release，例如 `v7.1.59-plus.ba4993c6`。
-6. 刷新固定 Release：`latest`。
+6. 原地刷新固定 Release：`latest`（不再 delete/recreate，降低短暂 404 风险）。
 
 日常使用只关心：
 
@@ -203,3 +213,8 @@ logs/*
 ```
 
 仓库里的配置模板只放占位符，不放真实 key。
+
+
+## 更新链路信任说明
+
+`update-cpa` 会执行本仓库 `latest` tag 中的安装脚本，并校验 Release 二进制的 sha256。sha256 用来防下载损坏；仓库和 Release 本身仍是信任根，请只在你控制的私有仓库中使用。

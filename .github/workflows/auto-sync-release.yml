@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   sync-build-release:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     env:
       FORCE_RELEASE: ${{ github.event.inputs.force_release || 'false' }}
       CPA_PLUS_SKIP_TESTS: "1"
@@ -63,7 +63,7 @@ jobs:
       - name: Decide whether to build and release
         id: changes
         run: |
-          if git diff --quiet -- CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE CPA_PLUS_SOURCE_COMMIT patches/cliproxyapi/0001-cpa-plus-integration.patch; then
+          if git diff --quiet -- CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE patches/cliproxyapi/0001-cpa-plus-integration.patch; then
             changed=false
           else
             changed=true
@@ -90,7 +90,7 @@ jobs:
       - name: Commit refreshed patch and metadata
         if: steps.changes.outputs.changed == 'true'
         run: |
-          git add CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE CPA_PLUS_SOURCE_COMMIT patches/cliproxyapi/0001-cpa-plus-integration.patch
+          git add CLI_UPSTREAM_BASE PLUS_UPSTREAM_BASE patches/cliproxyapi/0001-cpa-plus-integration.patch
           git commit -m "chore: sync upstream ${{ steps.sync.outputs.cli_version }} plus ${{ steps.sync.outputs.plus_version }}"
           git push origin HEAD:main
 
@@ -108,6 +108,7 @@ jobs:
           - CPA-Manager-Plus upstream version: ${{ steps.sync.outputs.plus_version }}
           - CPA-Manager-Plus upstream commit: ${{ steps.sync.outputs.plus_commit }}
           - Binary: CLIProxyAPI-linux-amd64
+          - Build base: ubuntu-22.04
 
           Download and run on Linux amd64. The bundled Plus panel is served at /management.html.
           NOTES
@@ -135,10 +136,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest --yes --cleanup-tag >/dev/null 2>&1 || true
           git tag -f latest HEAD
           git push origin refs/tags/latest --force
-          gh release create latest dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 \
-            --title "CPA-PLUS latest" \
-            --notes-file release-notes.md \
-            --latest
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 --clobber
+            gh release edit latest \
+              --title "CPA-PLUS latest" \
+              --notes-file release-notes.md \
+              --latest
+          else
+            gh release create latest dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 \
+              --title "CPA-PLUS latest" \
+              --notes-file release-notes.md \
+              --latest
+          fi
