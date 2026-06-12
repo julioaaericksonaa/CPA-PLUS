@@ -168,12 +168,18 @@ test_generated_scripts_quote_single_quote_app_dir() {
 }
 
 test_systemd_unit_quotes_paths_with_spaces() {
-  grep -F 'WorkingDirectory=' "$ROOT_DIR/scripts/install-release.sh" | grep -F '"' >/dev/null \
-    || fail "install-release.sh systemd WorkingDirectory must quote APP_DIR"
+  grep -F 'WorkingDirectory=$(systemd_path_escape "$APP_DIR")' "$ROOT_DIR/scripts/install-release.sh" >/dev/null \
+    || fail "install-release.sh systemd WorkingDirectory must use systemd path escaping"
+  if grep -F 'WorkingDirectory=$(systemd_quote "$APP_DIR")' "$ROOT_DIR/scripts/install-release.sh" >/dev/null; then
+    fail "install-release.sh systemd WorkingDirectory must not use shell-style quotes"
+  fi
   grep -F 'ExecStart=' "$ROOT_DIR/scripts/install-release.sh" | grep -F '"' >/dev/null \
     || fail "install-release.sh systemd ExecStart must quote APP_DIR"
-  grep -F 'WorkingDirectory=' "$ROOT_DIR/scripts/install-systemd.sh" | grep -F '"' >/dev/null \
-    || fail "install-systemd.sh systemd WorkingDirectory must quote APP_DIR"
+  grep -F 'WorkingDirectory=$(systemd_path_escape "$APP_DIR")' "$ROOT_DIR/scripts/install-systemd.sh" >/dev/null \
+    || fail "install-systemd.sh systemd WorkingDirectory must use systemd path escaping"
+  if grep -F 'WorkingDirectory=$(systemd_quote "$APP_DIR")' "$ROOT_DIR/scripts/install-systemd.sh" >/dev/null; then
+    fail "install-systemd.sh systemd WorkingDirectory must not use shell-style quotes"
+  fi
   grep -F 'ExecStart=' "$ROOT_DIR/scripts/install-systemd.sh" | grep -F '"' >/dev/null \
     || fail "install-systemd.sh systemd ExecStart must quote APP_DIR"
 }

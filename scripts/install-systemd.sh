@@ -13,6 +13,30 @@ systemd_quote() {
   printf '"%s"' "$value"
 }
 
+systemd_path_escape() {
+  local value="$1"
+  local out=""
+  local i ch code
+  local old_lc_all="${LC_ALL:-}"
+  LC_ALL=C
+  for ((i = 0; i < ${#value}; i++)); do
+    ch="${value:i:1}"
+    case "$ch" in
+      [A-Za-z0-9_/:.,+@=-]) out+="$ch" ;;
+      *)
+        printf -v code '%02X' "'$ch"
+        out+="\\x${code}"
+        ;;
+    esac
+  done
+  if [[ -n "${old_lc_all}" ]]; then
+    LC_ALL="${old_lc_all}"
+  else
+    unset LC_ALL
+  fi
+  printf '%s' "$out"
+}
+
 if [[ "$(id -u)" != "0" ]]; then
   echo "install-systemd.sh must be run as root" >&2
   exit 1
@@ -32,7 +56,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=$(systemd_quote "$APP_DIR")
+WorkingDirectory=$(systemd_path_escape "$APP_DIR")
 ExecStart=$(systemd_quote "$APP_DIR/cli-proxy-api") -config $(systemd_quote "$APP_DIR/config.yaml")
 Restart=always
 RestartSec=3
