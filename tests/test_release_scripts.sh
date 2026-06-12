@@ -128,6 +128,13 @@ test_update_command_fetches_installer_from_main_by_default() {
   fi
 }
 
+test_plus_build_version_uses_tag_and_commit() {
+  grep -F 'nearest="$(git -C "${PLUS_DIR}" describe --tags --abbrev=0' "$ROOT_DIR/cpa-plus-core/prepare-source.sh" >/dev/null || \
+    fail "Plus build version must include nearest numeric tag"
+  grep -F "printf '%s+%s\\n' \"\${nearest}\" \"\${short}\"" "$ROOT_DIR/cpa-plus-core/prepare-source.sh" >/dev/null || \
+    fail "Plus build version must include short commit after nearest tag"
+}
+
 test_core_patch_excludes_non_runtime_files() {
   local patch="$ROOT_DIR/patches/cliproxyapi/0001-cpa-plus-integration.patch"
   for path in \
@@ -268,6 +275,7 @@ main() {
   test_workflow_keeps_only_latest_release
   test_workflow_release_notes_include_refresh_time
   test_update_command_fetches_installer_from_main_by_default
+  test_plus_build_version_uses_tag_and_commit
   test_core_patch_excludes_non_runtime_files
   test_plus_version_checks_use_integrated_backend
   test_generated_scripts_quote_single_quote_app_dir

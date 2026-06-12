@@ -31,6 +31,9 @@ export const compareUpstreamVersions = (latest?: string | null, current?: string
   const normalizedCurrent = (current || '').trim();
   if (!normalizedLatest || !normalizedCurrent) return 'unknown';
   if (normalizedLatest === normalizedCurrent) return 'latest';
+  if (/[+]([0-9a-f]{7,})$/i.test(normalizedLatest) || /[+]([0-9a-f]{7,})$/i.test(normalizedCurrent)) {
+    return 'update';
+  }
 
   const semanticComparison = compareVersions(normalizedLatest, normalizedCurrent);
   if (semanticComparison === 0) return 'latest';

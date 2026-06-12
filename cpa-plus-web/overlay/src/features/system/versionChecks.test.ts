@@ -7,7 +7,7 @@ describe('versionChecks', () => {
   });
 
   it('reads integrated Manager latest-version payload', () => {
-    expect(readManagerLatestTag({ 'latest-version': 'f2301ac8' })).toBe('f2301ac8');
+    expect(readManagerLatestTag({ 'latest-version': 'v1.4.1+f2301ac8' })).toBe('v1.4.1+f2301ac8');
   });
 
   it('reads CLIProxyAPI latest release version', () => {
@@ -17,5 +17,9 @@ describe('versionChecks', () => {
   it('compares commit-like upstream versions by exact value', () => {
     expect(compareUpstreamVersions('5ee6e23a', '5ee6e23a')).toBe('latest');
     expect(compareUpstreamVersions('11111111', '5ee6e23a')).toBe('update');
+  });
+
+  it('treats same tag with different Plus commit suffix as an update', () => {
+    expect(compareUpstreamVersions('v1.4.1+75e06189', 'v1.4.1+b4c93d13')).toBe('update');
   });
 });

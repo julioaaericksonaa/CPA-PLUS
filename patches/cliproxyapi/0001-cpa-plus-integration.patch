@@ -33,7 +33,7 @@ index e280b0db..e1f72824 100644
  
  func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
-index 98a3d753..4807c6a6 100644
+index 3c94df54..e4b2a6b8 100644
 --- a/config.example.yaml
 +++ b/config.example.yaml
 @@ -49,6 +49,15 @@ pprof:
@@ -219,7 +219,7 @@ index 5f0a03fb..4f6f5f40 100644
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 diff --git a/internal/api/handlers/management/config_basic.go b/internal/api/handlers/management/config_basic.go
-index a0818aa8..37c2210d 100644
+index a0818aa8..adbdd7e4 100644
 --- a/internal/api/handlers/management/config_basic.go
 +++ b/internal/api/handlers/management/config_basic.go
 @@ -1,12 +1,13 @@
@@ -237,15 +237,16 @@ index a0818aa8..37c2210d 100644
  	"strings"
  	"time"
  
-@@ -19,10 +20,13 @@ import (
+@@ -19,10 +20,14 @@ import (
  )
  
  const (
 -	latestReleaseURL       = "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest"
 -	latestReleaseUserAgent = "CLIProxyAPI"
-+	latestReleaseURL          = "https://github.com/router-for-me/CLIProxyAPI/releases/latest"
++	latestReleaseURL           = "https://github.com/router-for-me/CLIProxyAPI/releases/latest"
++	managerLatestReleaseURL    = "https://github.com/seakee/CPA-Manager-Plus/releases/latest"
 +	managerLatestCommitFeedURL = "https://github.com/seakee/CPA-Manager-Plus/commits/main.atom"
-+	latestReleaseUserAgent    = "CPA-PLUS"
++	latestReleaseUserAgent     = "CPA-PLUS"
  )
  
 +var gitHubCommitIDPattern = regexp.MustCompile(`Grit::Commit/([0-9a-fA-F]{40})`)
@@ -253,7 +254,7 @@ index a0818aa8..37c2210d 100644
  func (h *Handler) GetConfig(c *gin.Context) {
  	if h == nil || h.cfg == nil {
  		c.JSON(200, gin.H{})
-@@ -31,13 +35,7 @@ func (h *Handler) GetConfig(c *gin.Context) {
+@@ -31,13 +36,7 @@ func (h *Handler) GetConfig(c *gin.Context) {
  	c.JSON(200, new(*h.cfg))
  }
  
@@ -268,7 +269,7 @@ index a0818aa8..37c2210d 100644
  	client := &http.Client{Timeout: 10 * time.Second}
  	proxyURL := ""
  	if h != nil && h.cfg != nil {
-@@ -47,13 +45,20 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
+@@ -47,13 +46,20 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
  		sdkCfg := &sdkconfig.SDKConfig{ProxyURL: proxyURL}
  		util.SetProxy(sdkCfg, client)
  	}
@@ -290,7 +291,7 @@ index a0818aa8..37c2210d 100644
  	req.Header.Set("User-Agent", latestReleaseUserAgent)
  
  	resp, err := client.Do(req)
-@@ -67,28 +72,96 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
+@@ -67,28 +73,120 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
  		}
  	}()
  
@@ -320,13 +321,26 @@ index a0818aa8..37c2210d 100644
 +// GitHub's Atom feed, avoiding browser-side GitHub API calls and REST rate limits.
 +func (h *Handler) GetManagerLatestVersion(c *gin.Context) {
 +	client := h.latestVersionHTTPClient()
++	releaseTag := ""
++	releaseReq, errReleaseReq := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, managerLatestReleaseURL, nil)
++	if errReleaseReq == nil {
++		releaseReq.Header.Set("Accept", "text/html,*/*")
++		releaseReq.Header.Set("User-Agent", latestReleaseUserAgent)
++		if releaseResp, errDo := client.Do(releaseReq); errDo == nil {
++			releaseTag = latestReleaseVersionFromURL(releaseResp.Request.URL.String())
++			if errClose := releaseResp.Body.Close(); errClose != nil {
++				log.WithError(errClose).Debug("failed to close manager latest release response body")
++			}
++		}
+ 	}
+-	if version == "" {
+-		c.JSON(http.StatusBadGateway, gin.H{"error": "invalid_response", "message": "missing release version"})
++
 +	req, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, managerLatestCommitFeedURL, nil)
 +	if err != nil {
 +		c.JSON(http.StatusInternalServerError, gin.H{"error": "request_create_failed", "message": err.Error()})
 +		return
- 	}
--	if version == "" {
--		c.JSON(http.StatusBadGateway, gin.H{"error": "invalid_response", "message": "missing release version"})
++	}
 +	req.Header.Set("Accept", "application/atom+xml,text/xml,*/*")
 +	req.Header.Set("User-Agent", latestReleaseUserAgent)
 +
@@ -344,25 +358,23 @@ index a0818aa8..37c2210d 100644
 +	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024*1024))
 +	if resp.StatusCode != http.StatusOK {
 +		c.JSON(http.StatusBadGateway, gin.H{"error": "unexpected_status", "message": fmt.Sprintf("status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))})
- 		return
- 	}
- 
--	c.JSON(http.StatusOK, gin.H{"latest-version": version})
++		return
++	}
++
 +	commit, err := latestCommitFromAtom(body)
 +	if err != nil {
 +		c.JSON(http.StatusBadGateway, gin.H{"error": "invalid_response", "message": err.Error()})
-+		return
-+	}
-+	short := shortVersionCommit(commit)
+ 		return
+ 	}
++	version := versionWithCommit(releaseTag, commit)
 +	c.JSON(http.StatusOK, gin.H{
-+		"latest-version": short,
-+		"latest_version":  short,
++		"latest-version": version,
++		"latest_version": version,
 +		"latest-commit":  commit,
 +		"latest_commit":  commit,
 +		"sha":            commit,
 +	})
 +}
-+
 +func latestReleaseVersionFromURL(rawURL string) string {
 +	parsed, err := url.Parse(rawURL)
 +	if err != nil {
@@ -379,7 +391,8 @@ index a0818aa8..37c2210d 100644
 +	}
 +	return strings.TrimSpace(tag)
 +}
-+
+ 
+-	c.JSON(http.StatusOK, gin.H{"latest-version": version})
 +func latestCommitFromAtom(body []byte) (string, error) {
 +	match := gitHubCommitIDPattern.FindSubmatch(body)
 +	if len(match) < 2 {
@@ -394,15 +407,27 @@ index a0818aa8..37c2210d 100644
 +		return trimmed[:8]
 +	}
 +	return trimmed
++}
++
++func versionWithCommit(version string, commit string) string {
++	short := shortVersionCommit(commit)
++	trimmedVersion := strings.TrimSpace(version)
++	if trimmedVersion == "" {
++		return short
++	}
++	if short == "" {
++		return trimmedVersion
++	}
++	return trimmedVersion + "+" + short
  }
  
  func WriteConfig(path string, data []byte) error {
 diff --git a/internal/api/handlers/management/config_basic_version_test.go b/internal/api/handlers/management/config_basic_version_test.go
 new file mode 100644
-index 00000000..684590a8
+index 00000000..12c572aa
 --- /dev/null
 +++ b/internal/api/handlers/management/config_basic_version_test.go
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,47 @@
 +package management
 +
 +import "testing"
@@ -436,11 +461,25 @@ index 00000000..684590a8
 +		t.Fatalf("shortVersionCommit() = %q, want %q", got, "f2301ac8")
 +	}
 +}
++
++func TestVersionWithCommitIncludesTagAndShortCommit(t *testing.T) {
++	got := versionWithCommit("v1.4.1", "f2301ac8b59b5763b95ed654d4de9ed296f1d318")
++	if got != "v1.4.1+f2301ac8" {
++		t.Fatalf("versionWithCommit() = %q, want %q", got, "v1.4.1+f2301ac8")
++	}
++}
++
++func TestVersionWithCommitFallsBackToShortCommit(t *testing.T) {
++	got := versionWithCommit("", "f2301ac8b59b5763b95ed654d4de9ed296f1d318")
++	if got != "f2301ac8" {
++		t.Fatalf("versionWithCommit() = %q, want %q", got, "f2301ac8")
++	}
++}
 diff --git a/internal/api/handlers/management/handler.go b/internal/api/handlers/management/handler.go
-index 01e96f05..91f5c98c 100644
+index b89830a1..10e77fbf 100644
 --- a/internal/api/handlers/management/handler.go
 +++ b/internal/api/handlers/management/handler.go
-@@ -165,9 +165,13 @@ func (h *Handler) SetPostAuthPersistHook(hook coreauth.PostAuthHook) {
+@@ -168,10 +168,14 @@ func (h *Handler) SetPostAuthPersistHook(hook coreauth.PostAuthHook) {
  // Additionally, remote access requires allow-remote-management=true.
  func (h *Handler) Middleware() gin.HandlerFunc {
  	return func(c *gin.Context) {
@@ -449,15 +488,16 @@ index 01e96f05..91f5c98c 100644
 +		c.Header("X-CPA-VERSION", buildinfo.ServerVersion())
 +		c.Header("X-CPA-COMMIT", buildinfo.ServerCommit())
  		c.Header("X-CPA-BUILD-DATE", buildinfo.BuildDate)
+ 		c.Header("X-CPA-SUPPORT-PLUGIN", pluginhost.SupportPluginHeaderValue())
 +		c.Header("X-CPA-UPSTREAM-VERSION", buildinfo.ServerVersion())
 +		c.Header("X-CPA-UPSTREAM-COMMIT", buildinfo.ServerCommit())
 +		c.Header("X-PLUS-UPSTREAM-VERSION", buildinfo.ManagerVersion())
-+		c.Header("X-PLUS-UPSTREAM-COMMIT", buildinfo.ManagerVersion())
++		c.Header("X-PLUS-UPSTREAM-COMMIT", buildinfo.ManagerCommit())
  
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index d486c4f7..401e2629 100644
+index dc939b52..19c76875 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -510,7 +550,7 @@ index d486c4f7..401e2629 100644
  	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
  	managementRoutesRegistered atomic.Bool
  	// managementRoutesEnabled controls whether management endpoints serve real handlers.
-@@ -316,6 +343,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -319,6 +346,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	if optionState.localPassword != "" {
  		s.mgmt.SetLocalPassword(optionState.localPassword)
  	}
@@ -525,7 +565,7 @@ index d486c4f7..401e2629 100644
  	logDir := logging.ResolveLogDirectory(cfg)
  	s.mgmt.SetLogDirectory(logDir)
  	if optionState.postAuthHook != nil {
-@@ -332,6 +367,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -335,6 +370,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  
  	// Setup routes
  	s.setupRoutes()
@@ -540,7 +580,7 @@ index d486c4f7..401e2629 100644
  
  	// Register Amp module using V2 interface with Context
  	s.ampModule = ampmodule.NewLegacy(accessManager, AuthMiddleware(accessManager))
-@@ -354,7 +397,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -357,7 +400,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	// or when a local management password is provided (e.g. TUI mode).
  	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
  	s.managementRoutesEnabled.Store(hasManagementSecret)
@@ -550,7 +590,7 @@ index d486c4f7..401e2629 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -594,11 +638,25 @@ func (s *Server) registerManagementRoutes() {
+@@ -597,11 +641,25 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -574,9 +614,9 @@ index d486c4f7..401e2629 100644
  		mgmt.GET("/latest-version", s.mgmt.GetLatestVersion)
 +		mgmt.GET("/manager-latest-version", s.mgmt.GetManagerLatestVersion)
  		mgmt.GET("/plugins", s.mgmt.ListPlugins)
- 		mgmt.PATCH("/plugins/:id/enabled", s.mgmt.PatchPluginEnabled)
- 		mgmt.PUT("/plugins/:id/config", s.mgmt.PutPluginConfig)
-@@ -751,6 +809,7 @@ func (s *Server) registerManagementRoutes() {
+ 		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
+ 		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
+@@ -756,6 +814,7 @@ func (s *Server) registerManagementRoutes() {
  		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
@@ -584,7 +624,7 @@ index d486c4f7..401e2629 100644
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -778,6 +837,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -783,6 +842,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -704,7 +744,7 @@ index d486c4f7..401e2629 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -865,6 +1037,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -870,6 +1042,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -716,7 +756,7 @@ index d486c4f7..401e2629 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1431,6 +1608,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1436,6 +1613,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -731,7 +771,7 @@ index d486c4f7..401e2629 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1541,6 +1726,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1546,6 +1731,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -740,7 +780,7 @@ index d486c4f7..401e2629 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1572,10 +1759,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1577,10 +1764,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -930,10 +970,10 @@ index 3556a581..56a709eb 100644
  	host := pluginhost.New()
  	server := newTestServerWithOptions(t, WithPluginHost(host))
 diff --git a/internal/buildinfo/buildinfo.go b/internal/buildinfo/buildinfo.go
-index 0bdfaf8b..b6432c02 100644
+index 0bdfaf8b..4de0bba0 100644
 --- a/internal/buildinfo/buildinfo.go
 +++ b/internal/buildinfo/buildinfo.go
-@@ -12,4 +12,63 @@ var (
+@@ -12,4 +12,68 @@ var (
  
  	// BuildDate records when the binary was built in UTC.
  	BuildDate = "unknown"
@@ -978,6 +1018,11 @@ index 0bdfaf8b..b6432c02 100644
 +	return "dev"
 +}
 +
++// ManagerCommit returns the short upstream CPA-Manager-Plus commit for display.
++func ManagerCommit() string {
++	return shortCommit(PlusUpstreamCommit)
++}
++
 +func shortCommit(value string) string {
 +	trimmed := trim(value)
 +	if len(trimmed) > 8 {
@@ -999,10 +1044,10 @@ index 0bdfaf8b..b6432c02 100644
 +}
 diff --git a/internal/buildinfo/buildinfo_test.go b/internal/buildinfo/buildinfo_test.go
 new file mode 100644
-index 00000000..6c99fd0c
+index 00000000..e77859e4
 --- /dev/null
 +++ b/internal/buildinfo/buildinfo_test.go
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,55 @@
 +package buildinfo
 +
 +import "testing"
@@ -1039,6 +1084,23 @@ index 00000000..6c99fd0c
 +
 +	if got, want := ManagerVersion(), "5ee6e23a"; got != want {
 +		t.Fatalf("ManagerVersion() = %q, want %q", got, want)
++	}
++}
++
++func TestManagerVersionUsesPlusTagAndCommitVersion(t *testing.T) {
++	oldPlusVersion, oldPlusCommit := PlusUpstreamVersion, PlusUpstreamCommit
++	t.Cleanup(func() {
++		PlusUpstreamVersion, PlusUpstreamCommit = oldPlusVersion, oldPlusCommit
++	})
++
++	PlusUpstreamVersion = "v1.4.1+b4c93d13"
++	PlusUpstreamCommit = "b4c93d138d9ca001b0b2243d8eda53a745f97e34"
++
++	if got, want := ManagerVersion(), "v1.4.1+b4c93d13"; got != want {
++		t.Fatalf("ManagerVersion() = %q, want %q", got, want)
++	}
++	if got, want := ManagerCommit(), "b4c93d13"; got != want {
++		t.Fatalf("ManagerCommit() = %q, want %q", got, want)
 +	}
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
