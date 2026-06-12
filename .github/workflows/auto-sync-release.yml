@@ -144,18 +144,11 @@ jobs:
         run: |
           git tag -f latest HEAD
           git push origin refs/tags/latest --force
-          if gh release view latest >/dev/null 2>&1; then
-            gh release upload latest dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 --clobber
-            gh release edit latest \
-              --title "CPA-PLUS latest" \
-              --notes-file release-notes.md \
-              --latest
-          else
-            gh release create latest dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 \
-              --title "CPA-PLUS latest" \
-              --notes-file release-notes.md \
-              --latest
-          fi
+          gh release delete latest --yes || true
+          gh release create latest dist/CLIProxyAPI-linux-amd64 dist/CLIProxyAPI-linux-amd64.sha256 \
+            --title "CPA-PLUS latest" \
+            --notes-file release-notes.md \
+            --latest
 
       - name: Delete old releases and tags
         if: steps.upstream.outputs.should_sync == 'true'

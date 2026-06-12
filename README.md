@@ -165,10 +165,10 @@ cron: 0 13 * * *
 3. 如果任意一个上游有更新，再拉取上游、应用 CPA-PLUS 集成 patch。
 4. 在 Ubuntu 22.04 构建 Linux amd64 二进制，降低 glibc 兼容性要求。
 5. 提交更新后的上游元数据和 patch 到 `main`。
-6. 只刷新固定 Release：`latest`。
+6. 删除并重建固定 Release：`latest`，让 GitHub Release 列表时间也刷新。
 7. 删除所有旧 Release 和非 `latest` tag，仓库只保留最新版 `latest` Release。
 
-说明：GitHub Release 顶部的 “released ... ago” 是 `latest` 这个 Release 首次创建时间；CPA-PLUS 会在 Release notes 中写入 `Updated at`，以它作为最新二进制发布时间。
+说明：重建 `latest` Release 会让 GitHub 顶部和列表里的发布时间同步刷新；发布过程中可能存在几秒钟短暂空窗，如果安装时刚好遇到 404，稍等后重试即可。
 
 日常使用只关心：
 

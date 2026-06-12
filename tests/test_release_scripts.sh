@@ -98,7 +98,14 @@ test_workflow_keeps_only_latest_release() {
   if grep -n 'gh release create "${TAG}"' "$wf" >/dev/null; then
     fail "workflow must not create versioned releases"
   fi
-  grep -F 'gh release create latest' "$wf" >/dev/null || fail "workflow must create latest release when missing"
+  grep -F 'gh release delete latest --yes || true' "$wf" >/dev/null || fail "workflow must delete latest release before recreating it"
+  grep -F 'gh release create latest' "$wf" >/dev/null || fail "workflow must recreate latest release"
+  if grep -F 'gh release edit latest' "$wf" >/dev/null; then
+    fail "workflow must recreate latest release instead of editing it in place"
+  fi
+  if grep -F -- '--clobber' "$wf" >/dev/null; then
+    fail "workflow must recreate latest assets instead of clobbering them in place"
+  fi
   grep -F 'gh release delete "$tag" --yes --cleanup-tag' "$wf" >/dev/null || fail "workflow must delete old releases"
   grep -F 'git push origin ":refs/tags/${tag}"' "$wf" >/dev/null || fail "workflow must delete old non-latest tags"
 }
