@@ -118,6 +118,16 @@ test_workflow_release_notes_include_refresh_time() {
     fail "workflow release notes must include the refresh time"
 }
 
+test_update_command_fetches_installer_from_main_by_default() {
+  grep -F 'REF="${CPA_PLUS_INSTALL_REF:-main}"' "$ROOT_DIR/scripts/install-release.sh" >/dev/null || \
+    fail "install-release.sh must default installer ref to main"
+  grep -F 'REF="${CPA_PLUS_INSTALL_REF:-main}"' "$ROOT_DIR/scripts/update-cpa" >/dev/null || \
+    fail "update-cpa must default installer ref to main"
+  if grep -F 'CPA_PLUS_INSTALL_REF:-latest' "$ROOT_DIR/scripts/install-release.sh" "$ROOT_DIR/scripts/update-cpa" >/dev/null; then
+    fail "update command must not default installer ref to moving latest tag"
+  fi
+}
+
 test_core_patch_excludes_non_runtime_files() {
   local patch="$ROOT_DIR/patches/cliproxyapi/0001-cpa-plus-integration.patch"
   for path in \
@@ -257,6 +267,7 @@ main() {
   test_workflow_detects_upstream_before_heavy_steps
   test_workflow_keeps_only_latest_release
   test_workflow_release_notes_include_refresh_time
+  test_update_command_fetches_installer_from_main_by_default
   test_core_patch_excludes_non_runtime_files
   test_plus_version_checks_use_integrated_backend
   test_generated_scripts_quote_single_quote_app_dir

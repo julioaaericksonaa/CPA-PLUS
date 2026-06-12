@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO="${CPA_PLUS_REPO:-julioaaericksonaa/CPA-PLUS}"
-REF="${CPA_PLUS_INSTALL_REF:-latest}"
+REF="${CPA_PLUS_INSTALL_REF:-main}"
 RELEASE="${CPA_PLUS_RELEASE:-latest}"
 APP_DIR="${CPA_PLUS_APP_DIR:-/root/apps/cliproxyapi-plus}"
 PORT="${CPA_PLUS_PORT:-8317}"

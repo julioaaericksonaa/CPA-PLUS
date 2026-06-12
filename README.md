@@ -49,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/julioaaericksonaa/CPA-PLUS/main/scr
 update-cpa
 ```
 
-`update-cpa` 默认从 `latest` tag 拉取安装脚本、下载最新已发布的 `latest` Release，保留你的 `config.yaml`、`data/`、`logs/`，只替换二进制并重启服务。
+`update-cpa` 默认从 `main` 拉取最新安装脚本、下载最新已发布的 `latest` Release，保留你的 `config.yaml`、`data/`、`logs/`，只替换二进制并重启服务。
 
 > 以后主要看 Release，不需要自己本机构建：Actions 每天 21:00 自动拉取上游、合并、构建、发布。
 
@@ -226,4 +226,4 @@ logs/*
 
 ## 更新链路信任说明
 
-`update-cpa` 会执行本仓库 `latest` tag 中的安装脚本，并校验 Release 二进制的 sha256。sha256 用来防下载损坏；仓库和 Release 本身仍是信任根，请只在你控制的私有仓库中使用。
+`update-cpa` 会执行本仓库 `main` 中的安装脚本，并校验 Release 二进制的 sha256。sha256 用来防下载损坏；仓库和 Release 本身仍是信任根，请只在你控制的私有仓库中使用。

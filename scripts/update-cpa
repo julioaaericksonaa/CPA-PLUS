@@ -26,7 +26,7 @@ case "${1:-}" in
 esac
 
 REPO="${CPA_PLUS_REPO:-julioaaericksonaa/CPA-PLUS}"
-REF="${CPA_PLUS_INSTALL_REF:-latest}"
+REF="${CPA_PLUS_INSTALL_REF:-main}"
 
 if command -v gh >/dev/null 2>&1 && gh auth status --hostname github.com >/dev/null 2>&1; then
   gh api "repos/${REPO}/contents/scripts/install-release.sh?ref=${REF}" --jq .content | base64 -d | bash -s -- "$@"
