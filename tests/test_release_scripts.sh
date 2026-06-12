@@ -103,6 +103,14 @@ test_workflow_keeps_only_latest_release() {
   grep -F 'git push origin ":refs/tags/${tag}"' "$wf" >/dev/null || fail "workflow must delete old non-latest tags"
 }
 
+test_workflow_release_notes_include_refresh_time() {
+  local wf="$ROOT_DIR/.github/workflows/auto-sync-release.yml"
+  grep -F 'updated_at="$(TZ=Asia/Shanghai date' "$wf" >/dev/null || \
+    fail "workflow release notes must compute Asia/Shanghai refresh time"
+  grep -F 'Updated at: ${updated_at}' "$wf" >/dev/null || \
+    fail "workflow release notes must include the refresh time"
+}
+
 test_core_patch_excludes_non_runtime_files() {
   local patch="$ROOT_DIR/patches/cliproxyapi/0001-cpa-plus-integration.patch"
   for path in \
@@ -235,6 +243,7 @@ main() {
   test_workflow_ignores_source_commit_for_change_detection
   test_workflow_detects_upstream_before_heavy_steps
   test_workflow_keeps_only_latest_release
+  test_workflow_release_notes_include_refresh_time
   test_core_patch_excludes_non_runtime_files
   test_plus_version_checks_use_integrated_backend
   test_generated_scripts_quote_single_quote_app_dir

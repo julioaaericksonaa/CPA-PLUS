@@ -121,8 +121,11 @@ jobs:
       - name: Prepare release metadata
         if: steps.upstream.outputs.should_sync == 'true'
         run: |
+          updated_at="$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')"
           cat > release-notes.md <<NOTES
           CPA-PLUS latest binary release
+
+          Updated at: ${updated_at}
 
           - CLIProxyAPI upstream version: ${{ steps.sync.outputs.cli_version }}
           - CLIProxyAPI upstream commit: ${{ steps.sync.outputs.cli_commit }}
