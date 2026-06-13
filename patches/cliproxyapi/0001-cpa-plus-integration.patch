@@ -784,7 +784,7 @@ index ba2ef3c9..36634739 100644
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index 9b414d7c..4c5af12a 100644
+index 1d7bd28b..cb6a175f 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -904,7 +904,7 @@ index 9b414d7c..4c5af12a 100644
  		mgmt.GET("/plugins", s.mgmt.ListPlugins)
  		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
  		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
-@@ -779,6 +838,7 @@ func (s *Server) registerManagementRoutes() {
+@@ -780,6 +839,7 @@ func (s *Server) registerManagementRoutes() {
  		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
@@ -912,7 +912,7 @@ index 9b414d7c..4c5af12a 100644
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -806,6 +866,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -807,6 +867,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -1032,7 +1032,7 @@ index 9b414d7c..4c5af12a 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -893,6 +1066,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -894,6 +1067,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -1044,7 +1044,7 @@ index 9b414d7c..4c5af12a 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1459,6 +1637,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1460,6 +1638,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -1059,7 +1059,7 @@ index 9b414d7c..4c5af12a 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1570,6 +1756,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1571,6 +1757,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -1068,7 +1068,7 @@ index 9b414d7c..4c5af12a 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1601,10 +1789,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1602,10 +1790,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -1092,7 +1092,7 @@ index 9b414d7c..4c5af12a 100644
  	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
  		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 diff --git a/internal/api/server_test.go b/internal/api/server_test.go
-index b3b4eaa2..28ca9969 100644
+index f71deacd..80fb81fb 100644
 --- a/internal/api/server_test.go
 +++ b/internal/api/server_test.go
 @@ -1,6 +1,7 @@
