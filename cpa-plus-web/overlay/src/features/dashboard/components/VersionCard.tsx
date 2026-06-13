@@ -101,6 +101,7 @@ export function VersionCard({
   const [requestLogDraft, setRequestLogDraft] = useState(false);
   const [requestLogTouched, setRequestLogTouched] = useState(false);
   const [requestLogSaving, setRequestLogSaving] = useState(false);
+  const [updatingCPAPlus, setUpdatingCPAPlus] = useState(false);
   const versionTapCount = useRef(0);
   const versionTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -279,6 +280,23 @@ export function VersionCard({
     }
   }, [apiVersion, showNotification, t]);
 
+  const handleCPAPlusUpdate = useCallback(async () => {
+    setUpdatingCPAPlus(true);
+    try {
+      const data = await versionApi.triggerCPAPlusUpdate();
+      const message =
+        typeof data.message === 'string' && data.message.trim()
+          ? data.message
+          : t('dashboard.cpa_plus_update_started');
+      showNotification(message, 'success');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+      showNotification(message || t('dashboard.cpa_plus_update_failed'), 'warning');
+    } finally {
+      setUpdatingCPAPlus(false);
+    }
+  }, [showNotification, t]);
+
   useEffect(() => {
     if (requestLogModalOpen && !requestLogTouched) {
       setRequestLogDraft(requestLogEnabled);
@@ -293,14 +311,24 @@ export function VersionCard({
     };
   }, []);
 
+  const appVersionState = useMemo(
+    () => compareUpstreamVersions(latest.latestApp, appVersion),
+    [appVersion, latest.latestApp]
+  );
+  const apiVersionState = useMemo(
+    () => compareUpstreamVersions(latest.latestApi, apiVersion),
+    [apiVersion, latest.latestApi]
+  );
   const appBadge = useMemo(
-    () => renderBadge(compareUpstreamVersions(latest.latestApp, appVersion), latest.latestApp, t),
-    [appVersion, latest.latestApp, t]
+    () => renderBadge(appVersionState, latest.latestApp, t),
+    [appVersionState, latest.latestApp, t]
   );
   const apiBadge = useMemo(
-    () => renderBadge(compareUpstreamVersions(latest.latestApi, apiVersion), latest.latestApi, t),
-    [apiVersion, latest.latestApi, t]
+    () => renderBadge(apiVersionState, latest.latestApi, t),
+    [apiVersionState, latest.latestApi, t]
   );
+  const hasUpstreamUpdate =
+    connectionStatus === 'connected' && (appVersionState === 'update' || apiVersionState === 'update');
 
   const buildTimeDisplay = serverBuildDate
     ? new Date(serverBuildDate).toLocaleString(i18n.language)
@@ -395,7 +423,22 @@ export function VersionCard({
   return (
     <div className={styles.container}>
       <section className={styles.section}>
-        <h2 className={styles.heading}>{t('dashboard.system_overview')}</h2>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.heading}>{t('dashboard.system_overview')}</h2>
+          {hasUpstreamUpdate && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className={styles.updateNowButton}
+              onClick={() => void handleCPAPlusUpdate()}
+              loading={updatingCPAPlus}
+            >
+              {!updatingCPAPlus && <IconRefreshCw size={16} />}
+              {t('dashboard.cpa_plus_update_now')}
+            </Button>
+          )}
+        </div>
         <div className={`${styles.grid} ${styles.systemGrid}`}>
           <div
             className={`${styles.item} ${styles.tapItem}`}

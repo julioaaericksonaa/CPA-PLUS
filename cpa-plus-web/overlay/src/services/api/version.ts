@@ -16,5 +16,7 @@ export interface ManagerLatestRelease {
 export const versionApi = {
   checkLatest: () => apiClient.get<Record<string, unknown>>('/latest-version'),
 
-  checkManagerLatest: () => apiClient.get<ManagerLatestRelease>('/manager-latest-version')
+  checkManagerLatest: () => apiClient.get<ManagerLatestRelease>('/manager-latest-version'),
+
+  triggerCPAPlusUpdate: () => apiClient.post<Record<string, unknown>>('/cpa-plus/update')
 };

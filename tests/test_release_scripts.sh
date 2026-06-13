@@ -165,6 +165,37 @@ test_plus_version_checks_use_integrated_backend() {
     fail "Plus version check must use /manager-latest-version"
 }
 
+test_dashboard_exposes_cpa_plus_update_button() {
+  local version_api="$ROOT_DIR/cpa-plus-web/overlay/src/services/api/version.ts"
+  local card="$ROOT_DIR/cpa-plus-web/overlay/src/features/dashboard/components/VersionCard.tsx"
+  grep -F "triggerCPAPlusUpdate: () => apiClient.post" "$version_api" >/dev/null || \
+    fail "version API must expose fixed CPA-PLUS update trigger"
+  grep -F "'/cpa-plus/update'" "$version_api" >/dev/null || \
+    fail "CPA-PLUS update trigger must call /cpa-plus/update"
+  grep -F "hasUpstreamUpdate" "$card" >/dev/null || \
+    fail "VersionCard must hide update button unless an upstream update exists"
+  grep -F "handleCPAPlusUpdate" "$card" >/dev/null || \
+    fail "VersionCard must provide a CPA-PLUS update click handler"
+  grep -F "dashboard.cpa_plus_update_now" "$card" >/dev/null || \
+    fail "VersionCard must render localized update button text"
+}
+
+test_patch_persists_cpa_plus_update_backend() {
+  local patch="$ROOT_DIR/patches/cliproxyapi/0001-cpa-plus-integration.patch"
+  grep -F 'mgmt.POST("/cpa-plus/update", s.mgmt.PostCPAPlusUpdate)' "$patch" >/dev/null || \
+    fail "integration patch must register /cpa-plus/update backend route"
+  grep -F "func (h *Handler) PostCPAPlusUpdate" "$patch" >/dev/null || \
+    fail "integration patch must persist PostCPAPlusUpdate handler"
+  grep -F 'cpaPlusUpdateCommand       = "/usr/local/bin/update-cpa"' "$patch" >/dev/null || \
+    fail "integration patch must run the installed update-cpa command"
+  grep -F "func cpaPlusSystemdRunCommand" "$patch" >/dev/null || \
+    fail "integration patch must persist systemd-run update detachment"
+  grep -F "systemd-run" "$patch" >/dev/null || \
+    fail "integration patch must use systemd-run when available"
+  grep -F "release_not_ready" "$patch" >/dev/null || \
+    fail "integration patch must report release_not_ready when latest Release is not refreshed yet"
+}
+
 test_generated_scripts_quote_single_quote_app_dir() {
   local tmp app
   tmp="$(mktemp -d)"
@@ -278,6 +309,8 @@ main() {
   test_plus_build_version_uses_tag_and_commit
   test_core_patch_excludes_non_runtime_files
   test_plus_version_checks_use_integrated_backend
+  test_dashboard_exposes_cpa_plus_update_button
+  test_patch_persists_cpa_plus_update_backend
   test_generated_scripts_quote_single_quote_app_dir
   test_systemd_unit_quotes_paths_with_spaces
   test_generated_runtime_scripts_support_systemd_mode
