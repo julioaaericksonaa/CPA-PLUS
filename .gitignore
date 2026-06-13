@@ -5,22 +5,38 @@ dist/
 
 # Local config and runtime data
 config.yaml
+config.local.yaml
+config.*.local.yaml
 .env
+.env.*
 .env.*.local
+!.env.example
 auths/*
 !auths/.gitkeep
 data/
 logs/
 *.sqlite
 *.db
+*.sqlite-*
+*.db-*
 
 # Local credentials/tooling
 .codex/
 .claude/
 .gemini/
 .ssh/
+credentials/
+tokens/
+cookies/
 *.key
 *.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.kubeconfig
+id_rsa*
+id_ed25519*
 
 # OS/editor
 .DS_Store
@@ -29,5 +45,9 @@ logs/
 __pycache__/
 *.py[cod]
 secrets.env
+secrets.*.env
 management-key.txt
+api-key.txt
+token.txt
+cookie.txt
 *.bak.*

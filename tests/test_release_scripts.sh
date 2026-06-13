@@ -300,6 +300,26 @@ test_readme_quotes_gh_api_urls() {
   fi
 }
 
+test_readme_is_public_repo_safe() {
+  local readme="$ROOT_DIR/README.md"
+  if grep -n "私有仓库" "$readme" >/dev/null; then
+    fail "README must not describe this public repository as private"
+  fi
+  if grep -n "gh auth login" "$readme" >/dev/null; then
+    fail "README public install path must not require gh auth login"
+  fi
+  grep -F "curl -fsSL https://raw.githubusercontent.com/julioaaericksonaa/CPA-PLUS/main/scripts/install-release.sh | bash" "$readme" >/dev/null || \
+    fail "README must keep a public curl install command"
+  grep -F "secrets.env" "$ROOT_DIR/.gitignore" >/dev/null || \
+    fail ".gitignore must ignore generated secrets.env"
+  grep -F "config.yaml" "$ROOT_DIR/.gitignore" >/dev/null || \
+    fail ".gitignore must ignore local config.yaml"
+  for pattern in ".env.*" "auths/*" "data/" "logs/" "*.sqlite" "*.db" "*.pem" "*.p12" "id_rsa*" "token.txt" "cookie.txt" "*.bak.*"; do
+    grep -F "$pattern" "$ROOT_DIR/.gitignore" >/dev/null || \
+      fail ".gitignore must ignore privacy pattern ${pattern}"
+  done
+}
+
 main() {
   test_workflow_ignores_source_commit_for_change_detection
   test_workflow_detects_upstream_before_heavy_steps
@@ -316,6 +336,7 @@ main() {
   test_generated_runtime_scripts_support_systemd_mode
   test_default_config_is_local_only_and_public_flag_is_explicit
   test_readme_quotes_gh_api_urls
+  test_readme_is_public_repo_safe
   echo "release script regression tests passed"
 }
 
