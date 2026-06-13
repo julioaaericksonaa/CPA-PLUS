@@ -5,6 +5,7 @@ dist/
 
 # Local config and runtime data
 config.yaml
+!examples/config.yaml
 config.local.yaml
 config.*.local.yaml
 .env
@@ -45,6 +46,7 @@ id_ed25519*
 __pycache__/
 *.py[cod]
 secrets.env
+!examples/secrets.env
 secrets.*.env
 management-key.txt
 api-key.txt

@@ -35,8 +35,6 @@ curl -fsSL https://raw.githubusercontent.com/julioaaericksonaa/CPA-PLUS/main/scr
 更新：update-cpa
 ```
 
-> `config.yaml`、`secrets.env`、`data/`、`logs/` 都是本机运行数据，不属于仓库内容，不要复制到公开 Issue、PR、截图或提交里。
-
 ---
 
 ## 一句话更新
@@ -92,19 +90,18 @@ curl -sS http://127.0.0.1:8317/healthz
 /root/apps/cliproxyapi-plus/secrets.env
 ```
 
-其中：
+仓库同时提供脱敏示例，便于了解配置结构：
 
-- `config.yaml`：你的真实运行配置，可能包含服务商 API Key、代理地址、管理密钥等敏感信息。
-- `secrets.env`：首次安装生成的面板管理密钥和客户端 API Key。
-- `data/`：Plus 统计、巡检和历史记录数据。
-- `logs/`：运行日志，可能包含请求路径、错误详情或其他上下文。
+```text
+examples/config.yaml
+examples/secrets.env
+```
 
-公开仓库使用原则：
+说明：
 
-1. 不提交 `config.yaml`、`secrets.env`、`.env*`、`auths/*`、`data/*`、`logs/*`、数据库、备份文件、私钥或 token。
-2. 不在 README、Issue、PR、Release notes 中粘贴真实 key、cookie、token、管理密钥、代理账号或本机专属路径中的敏感内容。
-3. 需要分享配置时，只分享脱敏片段，并把真实值替换为 `CHANGE_ME`、`example`、`redacted` 等占位符。
-4. 本仓库的配置模板只允许出现占位符；真实配置只保存在部署机器上。
+- `examples/config.yaml` 和 `examples/secrets.env` 只包含占位符，可作为参考模板。
+- 安装脚本会在部署目录生成实际运行文件；仓库默认只跟踪脱敏示例，不跟踪本地运行配置和数据。
+- 如需公开分享配置片段，请使用 `CHANGE_ME`、`example`、`redacted` 等占位符替换真实凭据。
 
 默认配置包含：
 
@@ -122,7 +119,7 @@ nano /root/apps/cliproxyapi-plus/config.yaml
 /root/apps/cliproxyapi-plus/restart.sh
 ```
 
-重新生成配置会备份旧配置；备份同样可能包含敏感信息，只保留在本机：
+重新生成配置会备份旧配置：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/julioaaericksonaa/CPA-PLUS/main/scripts/install-release.sh | bash -s -- --force-config

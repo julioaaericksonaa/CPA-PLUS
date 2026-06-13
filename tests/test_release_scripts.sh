@@ -310,6 +310,9 @@ test_readme_is_public_repo_safe() {
   fi
   grep -F "curl -fsSL https://raw.githubusercontent.com/julioaaericksonaa/CPA-PLUS/main/scripts/install-release.sh | bash" "$readme" >/dev/null || \
     fail "README must keep a public curl install command"
+  if grep -nE "不要复制到公开 Issue|截图|PR" "$readme" >/dev/null; then
+    fail "README should not include personal/internal privacy reminder wording"
+  fi
   grep -F "secrets.env" "$ROOT_DIR/.gitignore" >/dev/null || \
     fail ".gitignore must ignore generated secrets.env"
   grep -F "config.yaml" "$ROOT_DIR/.gitignore" >/dev/null || \
@@ -318,6 +321,24 @@ test_readme_is_public_repo_safe() {
     grep -F "$pattern" "$ROOT_DIR/.gitignore" >/dev/null || \
       fail ".gitignore must ignore privacy pattern ${pattern}"
   done
+}
+
+test_sanitized_examples_are_tracked() {
+  local config_example="$ROOT_DIR/examples/config.yaml"
+  local secrets_example="$ROOT_DIR/examples/secrets.env"
+  [[ -f "$config_example" ]] || fail "repository must include sanitized examples/config.yaml"
+  [[ -f "$secrets_example" ]] || fail "repository must include sanitized examples/secrets.env"
+  grep -F "CHANGE_ME_MANAGEMENT_KEY" "$config_example" >/dev/null || \
+    fail "example config must use a placeholder management key"
+  grep -F "CHANGE_ME_CLIENT_API_KEY" "$config_example" >/dev/null || \
+    fail "example config must use a placeholder client API key"
+  grep -F "CPA_PLUS_MANAGEMENT_KEY=CHANGE_ME_MANAGEMENT_KEY" "$secrets_example" >/dev/null || \
+    fail "example secrets.env must use placeholder management key"
+  grep -F "CPA_PLUS_API_KEY=CHANGE_ME_CLIENT_API_KEY" "$secrets_example" >/dev/null || \
+    fail "example secrets.env must use placeholder API key"
+  if grep -REn '(sk-[A-Za-z0-9_-]{12,}|AIza[0-9A-Za-z_-]{20,}|ghp_[0-9A-Za-z_]+|github_pat_|xox[baprs]-|AKIA[0-9A-Z]{16})' "$config_example" "$secrets_example" >/dev/null; then
+    fail "sanitized examples must not contain token-looking values"
+  fi
 }
 
 main() {
@@ -337,6 +358,7 @@ main() {
   test_default_config_is_local_only_and_public_flag_is_explicit
   test_readme_quotes_gh_api_urls
   test_readme_is_public_repo_safe
+  test_sanitized_examples_are_tracked
   echo "release script regression tests passed"
 }
 
