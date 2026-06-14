@@ -188,6 +188,36 @@ test_dashboard_exposes_cpa_plus_update_button() {
     fail "VersionCard must render localized update button text"
 }
 
+test_ai_provider_overlay_keeps_toolbar_i18n() {
+  for locale in en zh-CN zh-TW; do
+    local file="$ROOT_DIR/cpa-plus-web/overlay/src/i18n/locales/${locale}.json"
+    python3 - "$file" "$locale" <<'PY'
+import json
+import sys
+
+path, locale = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as fh:
+    data = json.load(fh)
+
+providers = data.get("ai_providers", {})
+required = [
+    "filter_all",
+    "health_check_button",
+    "add_config_button",
+    "table_aria_label",
+    "table_col_type",
+    "table_col_identity",
+    "table_col_models",
+    "table_col_recent",
+    "table_col_actions",
+]
+missing = [key for key in required if not providers.get(key)]
+if missing:
+    raise SystemExit(f"{locale} ai_providers missing toolbar translations: {', '.join(missing)}")
+PY
+  done
+}
+
 test_patch_persists_cpa_plus_update_backend() {
   local patch="$ROOT_DIR/patches/cliproxyapi/0001-cpa-plus-integration.patch"
   grep -F 'mgmt.POST("/cpa-plus/update", s.mgmt.PostCPAPlusUpdate)' "$patch" >/dev/null || \
@@ -365,6 +395,7 @@ main() {
   test_core_patch_excludes_non_runtime_files
   test_plus_version_checks_use_integrated_backend
   test_dashboard_exposes_cpa_plus_update_button
+  test_ai_provider_overlay_keeps_toolbar_i18n
   test_patch_persists_cpa_plus_update_backend
   test_generated_scripts_quote_single_quote_app_dir
   test_systemd_unit_quotes_paths_with_spaces
