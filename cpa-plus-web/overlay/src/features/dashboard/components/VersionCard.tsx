@@ -288,7 +288,15 @@ export function VersionCard({
         typeof data.message === 'string' && data.message.trim()
           ? data.message
           : t('dashboard.cpa_plus_update_started');
-      showNotification(message, 'success');
+      if (data.status === 'release_not_ready' || data.status === 'update_running') {
+        showNotification(message, 'warning');
+        return;
+      }
+      if (data.status === 'started') {
+        showNotification(message, 'success');
+        return;
+      }
+      showNotification(message, 'warning');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
       showNotification(message || t('dashboard.cpa_plus_update_failed'), 'warning');

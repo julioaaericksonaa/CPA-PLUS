@@ -176,6 +176,14 @@ test_dashboard_exposes_cpa_plus_update_button() {
     fail "VersionCard must hide update button unless an upstream update exists"
   grep -F "handleCPAPlusUpdate" "$card" >/dev/null || \
     fail "VersionCard must provide a CPA-PLUS update click handler"
+  grep -F "data.status === 'release_not_ready'" "$card" >/dev/null || \
+    fail "VersionCard must treat release_not_ready as a warning, not a successful update"
+  grep -F "data.status === 'update_running'" "$card" >/dev/null || \
+    fail "VersionCard must treat update_running as a non-error in-progress state"
+  grep -F "data.status === 'started'" "$card" >/dev/null || \
+    fail "VersionCard must only show success after the backend reports started"
+  grep -F "showNotification(message, 'warning')" "$card" >/dev/null || \
+    fail "VersionCard must show non-started update statuses as warnings"
   grep -F "dashboard.cpa_plus_update_now" "$card" >/dev/null || \
     fail "VersionCard must render localized update button text"
 }
@@ -192,6 +200,12 @@ test_patch_persists_cpa_plus_update_backend() {
     fail "integration patch must persist systemd-run update detachment"
   grep -F "systemd-run" "$patch" >/dev/null || \
     fail "integration patch must use systemd-run when available"
+  grep -F "func cpaPlusReleaseNotReadyHTTPStatus" "$patch" >/dev/null || \
+    fail "integration patch must persist non-error release-not-ready status"
+  grep -F "return http.StatusOK" "$patch" >/dev/null || \
+    fail "release-not-ready must use HTTP 200 so the browser does not report a failed POST"
+  grep -F "CPA_PLUS_SYSTEMD=0" "$patch" >/dev/null || \
+    fail "self-update must disable installer systemd mode to avoid restart loops"
   grep -F "release_not_ready" "$patch" >/dev/null || \
     fail "integration patch must report release_not_ready when latest Release is not refreshed yet"
 }
