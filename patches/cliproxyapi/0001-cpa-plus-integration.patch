@@ -33,7 +33,7 @@ index e280b0db..e1f72824 100644
  
  func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
-index 1b408fad..fa031bd9 100644
+index e9bf009e..943f3f5e 100644
 --- a/config.example.yaml
 +++ b/config.example.yaml
 @@ -49,6 +49,15 @@ pprof:
@@ -799,10 +799,10 @@ index 00000000..38198b33
 +	}
 +}
 diff --git a/internal/api/handlers/management/handler.go b/internal/api/handlers/management/handler.go
-index ba2ef3c9..36634739 100644
+index dc07ee00..8931b0fe 100644
 --- a/internal/api/handlers/management/handler.go
 +++ b/internal/api/handlers/management/handler.go
-@@ -199,10 +199,14 @@ func (h *Handler) SetPostAuthPersistHook(hook coreauth.PostAuthHook) {
+@@ -218,10 +218,14 @@ func (h *Handler) SetPostAuthPersistHook(hook coreauth.PostAuthHook) {
  // Additionally, remote access requires allow-remote-management=true.
  func (h *Handler) Middleware() gin.HandlerFunc {
  	return func(c *gin.Context) {
@@ -820,7 +820,7 @@ index ba2ef3c9..36634739 100644
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index 834604ab..6f6ca24c 100644
+index 4572d3c1..901fada4 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -873,7 +873,7 @@ index 834604ab..6f6ca24c 100644
  	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
  	managementRoutesRegistered atomic.Bool
  	// managementRoutesEnabled controls whether management endpoints serve real handlers.
-@@ -335,6 +362,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -336,6 +363,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	if optionState.localPassword != "" {
  		s.mgmt.SetLocalPassword(optionState.localPassword)
  	}
@@ -888,7 +888,7 @@ index 834604ab..6f6ca24c 100644
  	logDir := logging.ResolveLogDirectory(cfg)
  	s.mgmt.SetLogDirectory(logDir)
  	if optionState.postAuthHook != nil {
-@@ -351,6 +386,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -352,6 +387,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  
  	// Setup routes
  	s.setupRoutes()
@@ -903,7 +903,7 @@ index 834604ab..6f6ca24c 100644
  
  	// Apply additional router configurators from options
  	if optionState.routerConfigurator != nil {
-@@ -361,7 +404,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -362,7 +405,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	// or when a local management password is provided (e.g. TUI mode).
  	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
  	s.managementRoutesEnabled.Store(hasManagementSecret)
@@ -913,7 +913,7 @@ index 834604ab..6f6ca24c 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -601,11 +645,26 @@ func (s *Server) registerManagementRoutes() {
+@@ -610,11 +654,26 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -940,7 +940,7 @@ index 834604ab..6f6ca24c 100644
  		mgmt.GET("/plugins", s.mgmt.ListPlugins)
  		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
  		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
-@@ -738,6 +797,7 @@ func (s *Server) registerManagementRoutes() {
+@@ -747,6 +806,7 @@ func (s *Server) registerManagementRoutes() {
  		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
@@ -948,7 +948,7 @@ index 834604ab..6f6ca24c 100644
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -765,6 +825,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -774,6 +834,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -1068,7 +1068,7 @@ index 834604ab..6f6ca24c 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -852,6 +1025,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -861,6 +1034,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -1080,7 +1080,7 @@ index 834604ab..6f6ca24c 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1418,6 +1596,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1501,6 +1679,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -1095,7 +1095,7 @@ index 834604ab..6f6ca24c 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1529,6 +1715,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1612,6 +1798,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -1104,7 +1104,7 @@ index 834604ab..6f6ca24c 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1560,10 +1748,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1643,10 +1831,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -1128,7 +1128,7 @@ index 834604ab..6f6ca24c 100644
  	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
  		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 diff --git a/internal/api/server_test.go b/internal/api/server_test.go
-index a694883f..9e1efa2c 100644
+index 0f42cac1..57f2ac5e 100644
 --- a/internal/api/server_test.go
 +++ b/internal/api/server_test.go
 @@ -1,6 +1,7 @@
@@ -1428,7 +1428,7 @@ index 00000000..e77859e4
 +	}
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
-index 12ba870d..ce1e4e55 100644
+index 66feabe0..332f8a49 100644
 --- a/internal/config/config.go
 +++ b/internal/config/config.go
 @@ -43,6 +43,9 @@ type Config struct {
@@ -1488,7 +1488,7 @@ index 12ba870d..ce1e4e55 100644
  // PluginsConfig holds dynamic plugin system settings.
  type PluginsConfig struct {
  	// Enabled toggles dynamic plugin loading.
-@@ -650,6 +693,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -652,6 +695,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  			if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
  				// Missing and optional: return empty config (cloud deploy standby).
  				cfg := &Config{}
@@ -1497,7 +1497,7 @@ index 12ba870d..ce1e4e55 100644
  				cfg.NormalizePluginsConfig()
  				return cfg, nil
  			}
-@@ -660,6 +705,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -662,6 +707,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	// In cloud deploy mode (optional=true), if file is empty or contains only whitespace, return empty config.
  	if optional && len(data) == 0 {
  		cfg := &Config{}
@@ -1506,7 +1506,7 @@ index 12ba870d..ce1e4e55 100644
  		cfg.NormalizePluginsConfig()
  		return cfg, nil
  	}
-@@ -678,10 +725,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -680,10 +727,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	cfg.Pprof.Enable = false
  	cfg.Pprof.Addr = DefaultPprofAddr
  	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
@@ -1520,7 +1520,7 @@ index 12ba870d..ce1e4e55 100644
  			cfgOptional.NormalizePluginsConfig()
  			return cfgOptional, nil
  		}
-@@ -731,6 +781,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -733,6 +783,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  		cfg.MaxRetryCredentials = 0
  	}
  
