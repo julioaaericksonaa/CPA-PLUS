@@ -274,6 +274,59 @@ PY
   done
 }
 
+test_overlay_keeps_plugin_store_i18n() {
+  for locale in en zh-CN zh-TW; do
+    local file="$ROOT_DIR/cpa-plus-web/overlay/src/i18n/locales/${locale}.json"
+    python3 - "$file" "$locale" <<'PY'
+import json
+import sys
+
+path, locale = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as fh:
+    data = json.load(fh)
+
+checks = {
+    "nav": ["plugin_store", "plugin_store_short"],
+    "plugin_store": [
+        "title",
+        "description",
+        "refresh",
+        "global_status",
+        "global_disabled",
+        "plugins_dir",
+        "sources",
+        "stat_available",
+        "search_placeholder",
+        "manage",
+        "install",
+        "badge_not_installed",
+        "badge_untrusted",
+        "meta_version",
+        "meta_author",
+        "meta_license",
+        "meta_source",
+    ],
+    "plugin_resource": [
+        "title",
+        "load_failed",
+        "not_found",
+        "unsupported_backend",
+    ],
+}
+
+missing = []
+for namespace, keys in checks.items():
+    values = data.get(namespace, {})
+    for key in keys:
+        if not isinstance(values, dict) or not values.get(key):
+            missing.append(f"{namespace}.{key}")
+
+if missing:
+    raise SystemExit(f"{locale} missing plugin store translations: {', '.join(missing)}")
+PY
+  done
+}
+
 test_plus_web_integrates_account_action_candidate_paths() {
   local patcher="$ROOT_DIR/cpa-plus-web/patch-plus-web-integrated.py"
   grep -F "'/v0/management/account-action-candidates'" "$patcher" >/dev/null || \
@@ -463,6 +516,7 @@ main() {
   test_dashboard_exposes_cpa_plus_update_button
   test_ai_provider_overlay_keeps_toolbar_i18n
   test_overlay_keeps_plugin_and_account_action_i18n
+  test_overlay_keeps_plugin_store_i18n
   test_plus_web_integrates_account_action_candidate_paths
   test_patch_persists_cpa_plus_update_backend
   test_generated_scripts_quote_single_quote_app_dir
