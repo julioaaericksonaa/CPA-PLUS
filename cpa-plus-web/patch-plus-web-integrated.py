@@ -17,6 +17,11 @@ REPLACEMENTS = [
     ("'/v0/management/usage/import'", "'/v0/management/plus/usage/import'"),
     ("'/v0/management/dashboard/summary'", "'/v0/management/plus/dashboard/summary'"),
     ("'/v0/management/monitoring/analytics'", "'/v0/management/plus/monitoring/analytics'"),
+    ("'/v0/management/account-action-candidates'", "'/v0/management/plus/account-action-candidates'"),
+    ("`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/ignore`", "`/v0/management/plus/account-action-candidates/${encodeURIComponent(String(id))}/ignore`"),
+    ("`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/resolve`", "`/v0/management/plus/account-action-candidates/${encodeURIComponent(String(id))}/resolve`"),
+    ("`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/enable`", "`/v0/management/plus/account-action-candidates/${encodeURIComponent(String(id))}/enable`"),
+    ("`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/auth-file`", "`/v0/management/plus/account-action-candidates/${encodeURIComponent(String(id))}/auth-file`"),
 ]
 
 REQUIRED = [
@@ -29,6 +34,7 @@ REQUIRED = [
     "/v0/management/plus/usage/import",
     "/v0/management/plus/dashboard/summary",
     "/v0/management/plus/monitoring/analytics",
+    "/v0/management/plus/account-action-candidates",
 ]
 
 FORBIDDEN = [
@@ -41,6 +47,11 @@ FORBIDDEN = [
     "'/v0/management/usage/import'",
     "'/v0/management/dashboard/summary'",
     "'/v0/management/monitoring/analytics'",
+    "'/v0/management/account-action-candidates'",
+    "`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/ignore`",
+    "`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/resolve`",
+    "`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/enable`",
+    "`/v0/management/account-action-candidates/${encodeURIComponent(String(id))}/auth-file`",
 ]
 
 

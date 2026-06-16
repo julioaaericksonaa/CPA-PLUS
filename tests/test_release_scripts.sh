@@ -218,6 +218,72 @@ PY
   done
 }
 
+test_overlay_keeps_plugin_and_account_action_i18n() {
+  for locale in en zh-CN zh-TW; do
+    local file="$ROOT_DIR/cpa-plus-web/overlay/src/i18n/locales/${locale}.json"
+    python3 - "$file" "$locale" <<'PY'
+import json
+import sys
+
+path, locale = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as fh:
+    data = json.load(fh)
+
+checks = {
+    "nav": ["plugins", "account_actions", "account_actions_short"],
+    "plugin_management": [
+        "global_disabled_hint",
+        "tab_installed",
+        "tab_store",
+        "global_status",
+        "global_disabled",
+        "installed_count",
+        "effective_count",
+        "plugins_dir",
+        "search_placeholder",
+        "install_plugin",
+        "refresh",
+        "no_plugins",
+        "no_plugins_desc",
+    ],
+    "account_actions": [
+        "eyebrow",
+        "title",
+        "description",
+        "pending_count",
+        "visible_count",
+        "filter_pending",
+        "filter_all",
+        "load_failed_title",
+        "empty_title",
+        "col_account",
+        "col_operations",
+    ],
+}
+
+missing = []
+for namespace, keys in checks.items():
+    values = data.get(namespace, {})
+    for key in keys:
+        if not isinstance(values, dict) or not values.get(key):
+            missing.append(f"{namespace}.{key}")
+
+if missing:
+    raise SystemExit(f"{locale} missing translations: {', '.join(missing)}")
+PY
+  done
+}
+
+test_plus_web_integrates_account_action_candidate_paths() {
+  local patcher="$ROOT_DIR/cpa-plus-web/patch-plus-web-integrated.py"
+  grep -F "'/v0/management/account-action-candidates'" "$patcher" >/dev/null || \
+    fail "web patcher must rewrite account action candidate list path"
+  grep -F "'/v0/management/plus/account-action-candidates'" "$patcher" >/dev/null || \
+    fail "account action candidate list path must use integrated plus prefix"
+  grep -F "/v0/management/plus/account-action-candidates" "$patcher" >/dev/null || \
+    fail "web patcher must require integrated account action candidate paths"
+}
+
 test_patch_persists_cpa_plus_update_backend() {
   local patch="$ROOT_DIR/patches/cliproxyapi/0001-cpa-plus-integration.patch"
   grep -F 'mgmt.POST("/cpa-plus/update", s.mgmt.PostCPAPlusUpdate)' "$patch" >/dev/null || \
@@ -396,6 +462,8 @@ main() {
   test_plus_version_checks_use_integrated_backend
   test_dashboard_exposes_cpa_plus_update_button
   test_ai_provider_overlay_keeps_toolbar_i18n
+  test_overlay_keeps_plugin_and_account_action_i18n
+  test_plus_web_integrates_account_action_candidate_paths
   test_patch_persists_cpa_plus_update_backend
   test_generated_scripts_quote_single_quote_app_dir
   test_systemd_unit_quotes_paths_with_spaces
