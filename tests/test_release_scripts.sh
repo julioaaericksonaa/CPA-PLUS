@@ -70,7 +70,11 @@ def require(condition, message):
         sys.exit(1)
 
 require("force_release" not in text, "workflow must not expose force_release when no upstream changed")
-require("push:" in text, "workflow must refresh latest on main pushes")
+require("push:" not in text, "workflow must not run on pushes; local publish handles release uploads")
+require("workflow_dispatch:" not in text, "workflow must not expose manual runs; schedule must be the only trigger")
+require('cron: "0 13 * * *"' in text, "workflow must run once daily at 21:00 Asia/Shanghai")
+require('${GITHUB_EVENT_NAME}' not in text, "workflow release decision must not depend on push/manual events")
+require('should_release="${should_sync}"' in text, "workflow must release only when upstream changed")
 require("Detect upstream changes" in text, "workflow must detect upstream changes before sync/build")
 require("router-for-me/CLIProxyAPI.git" in text, "workflow must check CLIProxyAPI upstream")
 require("seakee/CPA-Manager-Plus.git" in text, "workflow must check CPA-Manager-Plus upstream")
@@ -94,6 +98,24 @@ for marker in [
     require("steps.upstream.outputs.should_sync == 'true'" in after, f"{marker} must only run when upstream changed")
 require(text.index("Commit refreshed patch and metadata") < text.index("Build Linux amd64 binary"), "workflow must commit synced upstream metadata before building the released binary")
 PY
+}
+
+test_local_publish_script_recreates_latest_release() {
+  local script="$ROOT_DIR/scripts/publish-latest-release.sh"
+  [[ -f "$script" ]] || fail "local publish script must exist"
+  grep -F '/root/.config/cpa-plus/publish.env' "$script" >/dev/null || \
+    fail "local publish script must load publish.env"
+  grep -F 'credential.helper=' "$script" >/dev/null || \
+    fail "local publish script must disable cached git credentials"
+  grep -F 'curl -fsS -X DELETE' "$script" >/dev/null || \
+    fail "local publish script must delete latest release before recreating it"
+  grep -F 'curl -fsS -X POST' "$script" >/dev/null || \
+    fail "local publish script must recreate latest release"
+  grep -F '"tag_name": "latest"' "$script" >/dev/null || \
+    fail "local publish script must create the fixed latest release"
+  if grep -F -- '--clobber' "$script" >/dev/null; then
+    fail "local publish script must recreate latest instead of clobbering assets"
+  fi
 }
 
 test_workflow_keeps_only_latest_release() {
@@ -367,6 +389,10 @@ test_patch_persists_cpa_plus_update_backend() {
     fail "self-update must allow slow release downloads to finish"
   grep -F -- "--property=RuntimeMaxSec=90min" "$patch" >/dev/null || \
     fail "systemd self-update unit must have a long runtime cap for slow downloads"
+  grep -F 'cpaPlusSystemdRunProxySetenvArgs' "$patch" >/dev/null || \
+    fail "systemd self-update unit must explicitly forward proxy env vars"
+  grep -F "http_proxy" "$patch" >/dev/null || \
+    fail "systemd self-update unit must forward http_proxy for GitHub downloads"
 }
 
 test_generated_scripts_quote_single_quote_app_dir() {
@@ -519,6 +545,7 @@ main() {
   test_workflow_detects_upstream_before_heavy_steps
   test_workflow_keeps_only_latest_release
   test_workflow_release_notes_include_refresh_time
+  test_local_publish_script_recreates_latest_release
   test_update_command_fetches_installer_from_main_by_default
   test_plus_build_version_uses_tag_and_commit
   test_core_patch_excludes_non_runtime_files

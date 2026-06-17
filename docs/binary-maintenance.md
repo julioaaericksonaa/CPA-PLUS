@@ -23,14 +23,18 @@
 
 ## 发布策略
 
-- 版本 Release：`${CLI_UPSTREAM_VERSION}-plus.${PLUS_UPSTREAM_VERSION}`，例如 `v7.1.59-plus.ba4993c6`。
-- 固定 Release：`latest`，始终覆盖为最新成功构建。
+- GitHub Actions 只在每天北京时间 21:00 执行一次。
+- Action 先检测 CLIProxyAPI 和 CPA-Manager-Plus 两个上游；任意上游有更新才同步、构建并重建固定 `latest` Release。
+- 如果两个上游都没有更新，Action 不安装构建环境、不构建、不发布。
+- 本地维护者手动提交代码时，如果已经在本机重新拉取并构建出新版二进制，使用 `scripts/publish-latest-release.sh` 直接推送代码并删除重建 `latest` Release。
+- 仓库不维护版本号 Release；固定 Release：`latest`。
 
 ## 本地维护
 
 ```bash
 ./scripts/ci-sync-upstream.sh
 ./scripts/build-linux-binary.sh --skip-tests
+./scripts/publish-latest-release.sh
 ```
 
 检查服务版本头：

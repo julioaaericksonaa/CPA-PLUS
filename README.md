@@ -166,6 +166,8 @@ bash scripts/install-release.sh --port 8318 --app-dir /root/apps/cpa-test --publ
 cron: 0 13 * * *
 ```
 
+该 Action 只按上面的定时每天运行一次；不会在 `push` 或手动触发时运行，避免 GitHub Actions 被频繁触发。
+
 自动流程：
 
 1. 先轻量检测两个上游 `main` 的最新 commit。
@@ -190,6 +192,14 @@ Release 资产：
 CLIProxyAPI-linux-amd64
 CLIProxyAPI-linux-amd64.sha256
 ```
+
+本地维护者如果已经在本机重新拉取、构建并提交了新版二进制对应的代码，可以用本地发布脚本直接推送代码并重建固定 `latest` Release：
+
+```bash
+./scripts/publish-latest-release.sh
+```
+
+脚本会读取 `/root/.config/cpa-plus/publish.env` 中的 GitHub 发布凭据，禁用缓存凭据，推送当前 `HEAD` 到 `main`，然后删除并重建 `latest` Release。
 
 ---
 

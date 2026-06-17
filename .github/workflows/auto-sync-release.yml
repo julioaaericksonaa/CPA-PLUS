@@ -1,13 +1,9 @@
 name: Auto sync upstream and release binary
 
 on:
-  push:
-    branches:
-      - main
   schedule:
     # Every day at 21:00 Asia/Shanghai (13:00 UTC). GitHub may delay scheduled runs.
     - cron: "0 13 * * *"
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,7 +14,6 @@ concurrency:
 
 jobs:
   sync-build-release:
-    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
     env:
       CPA_PLUS_SKIP_TESTS: "1"
@@ -56,10 +51,7 @@ jobs:
             should_sync=true
           fi
 
-          should_release=false
-          if [[ "${should_sync}" == "true" || "${GITHUB_EVENT_NAME}" == "push" || "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            should_release=true
-          fi
+          should_release="${should_sync}"
 
           {
             echo "current_cli=${current_cli}"
@@ -77,10 +69,10 @@ jobs:
           echo "should_sync=${should_sync}"
           echo "should_release=${should_release}"
 
-      - name: Stop when no upstream changed and no release requested
+      - name: Stop when no upstream changed
         if: steps.upstream.outputs.should_release != 'true'
         run: |
-          echo "No upstream change and no push/manual release request; sync/build/release skipped."
+          echo "No upstream change; sync/build/release skipped."
 
       - name: Setup Go
         if: steps.upstream.outputs.should_release == 'true'
