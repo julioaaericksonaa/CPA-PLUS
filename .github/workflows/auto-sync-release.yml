@@ -1,8 +1,11 @@
 name: Auto sync upstream and release binary
 
 on:
+  push:
+    branches:
+      - main
   schedule:
-    # Every day at 21:00 Asia/Shanghai (13:00 UTC).
+    # Every day at 21:00 Asia/Shanghai (13:00 UTC). GitHub may delay scheduled runs.
     - cron: "0 13 * * *"
   workflow_dispatch:
 
@@ -15,6 +18,7 @@ concurrency:
 
 jobs:
   sync-build-release:
+    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
     runs-on: ubuntu-22.04
     env:
       CPA_PLUS_SKIP_TESTS: "1"
@@ -52,6 +56,11 @@ jobs:
             should_sync=true
           fi
 
+          should_release=false
+          if [[ "${should_sync}" == "true" || "${GITHUB_EVENT_NAME}" == "push" || "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            should_release=true
+          fi
+
           {
             echo "current_cli=${current_cli}"
             echo "latest_cli=${latest_cli}"
@@ -60,31 +69,33 @@ jobs:
             echo "cli_changed=${cli_changed}"
             echo "plus_changed=${plus_changed}"
             echo "should_sync=${should_sync}"
+            echo "should_release=${should_release}"
           } >> "${GITHUB_OUTPUT}"
 
           echo "CLIProxyAPI current=${current_cli} latest=${latest_cli} changed=${cli_changed}"
           echo "CPA-Manager-Plus current=${current_plus} latest=${latest_plus} changed=${plus_changed}"
           echo "should_sync=${should_sync}"
+          echo "should_release=${should_release}"
 
-      - name: Stop when no upstream changed
-        if: steps.upstream.outputs.should_sync != 'true'
+      - name: Stop when no upstream changed and no release requested
+        if: steps.upstream.outputs.should_release != 'true'
         run: |
-          echo "No upstream change detected; sync/build/release skipped."
+          echo "No upstream change and no push/manual release request; sync/build/release skipped."
 
       - name: Setup Go
-        if: steps.upstream.outputs.should_sync == 'true'
+        if: steps.upstream.outputs.should_release == 'true'
         uses: actions/setup-go@v5
         with:
           go-version: "1.26.x"
 
       - name: Setup Node.js
-        if: steps.upstream.outputs.should_sync == 'true'
+        if: steps.upstream.outputs.should_release == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "24"
 
       - name: Install system dependencies
-        if: steps.upstream.outputs.should_sync == 'true'
+        if: steps.upstream.outputs.should_release == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rsync build-essential pkg-config
@@ -101,12 +112,6 @@ jobs:
         run: |
           ./scripts/ci-sync-upstream.sh
 
-      - name: Build Linux amd64 binary
-        if: steps.upstream.outputs.should_sync == 'true'
-        run: |
-          ./scripts/build-linux-binary.sh --skip-tests
-          sha256sum dist/CLIProxyAPI-linux-amd64 > dist/CLIProxyAPI-linux-amd64.sha256
-
       - name: Commit refreshed patch and metadata
         if: steps.upstream.outputs.should_sync == 'true'
         run: |
@@ -118,19 +123,29 @@ jobs:
             git push origin HEAD:main
           fi
 
+      - name: Build Linux amd64 binary
+        if: steps.upstream.outputs.should_release == 'true'
+        run: |
+          ./scripts/build-linux-binary.sh --skip-tests
+          sha256sum dist/CLIProxyAPI-linux-amd64 > dist/CLIProxyAPI-linux-amd64.sha256
+
       - name: Prepare release metadata
-        if: steps.upstream.outputs.should_sync == 'true'
+        if: steps.upstream.outputs.should_release == 'true'
         run: |
           updated_at="$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S %Z')"
+          if [[ -f .build/out/CLIProxyAPI/.cpa-plus-auto-build.env ]]; then
+            # shellcheck disable=SC1091
+            source .build/out/CLIProxyAPI/.cpa-plus-auto-build.env
+          fi
           cat > release-notes.md <<NOTES
           CPA-PLUS latest binary release
 
           Updated at: ${updated_at}
 
-          - CLIProxyAPI upstream version: ${{ steps.sync.outputs.cli_version }}
-          - CLIProxyAPI upstream commit: ${{ steps.sync.outputs.cli_commit }}
-          - CPA-Manager-Plus upstream version: ${{ steps.sync.outputs.plus_version }}
-          - CPA-Manager-Plus upstream commit: ${{ steps.sync.outputs.plus_commit }}
+          - CLIProxyAPI upstream version: ${CLI_UPSTREAM_VERSION:-unknown}
+          - CLIProxyAPI upstream commit: ${CLI_UPSTREAM_COMMIT:-${{ steps.upstream.outputs.latest_cli }}}
+          - CPA-Manager-Plus upstream version: ${PLUS_UPSTREAM_VERSION:-unknown}
+          - CPA-Manager-Plus upstream commit: ${PLUS_UPSTREAM_COMMIT:-${{ steps.upstream.outputs.latest_plus }}}
           - Binary: CLIProxyAPI-linux-amd64
           - Build base: ubuntu-22.04
 
@@ -138,7 +153,7 @@ jobs:
           NOTES
 
       - name: Refresh fixed latest release
-        if: steps.upstream.outputs.should_sync == 'true'
+        if: steps.upstream.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -151,7 +166,7 @@ jobs:
             --latest
 
       - name: Delete old releases and tags
-        if: steps.upstream.outputs.should_sync == 'true'
+        if: steps.upstream.outputs.should_release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

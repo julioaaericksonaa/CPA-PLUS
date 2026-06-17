@@ -70,6 +70,7 @@ def require(condition, message):
         sys.exit(1)
 
 require("force_release" not in text, "workflow must not expose force_release when no upstream changed")
+require("push:" in text, "workflow must refresh latest on main pushes")
 require("Detect upstream changes" in text, "workflow must detect upstream changes before sync/build")
 require("router-for-me/CLIProxyAPI.git" in text, "workflow must check CLIProxyAPI upstream")
 require("seakee/CPA-Manager-Plus.git" in text, "workflow must check CPA-Manager-Plus upstream")
@@ -78,15 +79,20 @@ for marker in [
     "Setup Go",
     "Setup Node.js",
     "Install system dependencies",
-    "Sync upstream metadata and patch",
     "Build Linux amd64 binary",
-    "Commit refreshed patch and metadata",
     "Prepare release metadata",
     "Refresh fixed latest release",
 ]:
     before = text[:text.index(marker)]
     after = text[text.index(marker): text.find("\n\n", text.index(marker)) if text.find("\n\n", text.index(marker)) != -1 else len(text)]
-    require("steps.upstream.outputs.should_sync == 'true'" in after, f"{marker} must be gated by upstream change")
+    require("steps.upstream.outputs.should_release == 'true'" in after, f"{marker} must be gated by release decision")
+for marker in [
+    "Sync upstream metadata and patch",
+    "Commit refreshed patch and metadata",
+]:
+    after = text[text.index(marker): text.find("\n\n", text.index(marker)) if text.find("\n\n", text.index(marker)) != -1 else len(text)]
+    require("steps.upstream.outputs.should_sync == 'true'" in after, f"{marker} must only run when upstream changed")
+require(text.index("Commit refreshed patch and metadata") < text.index("Build Linux amd64 binary"), "workflow must commit synced upstream metadata before building the released binary")
 PY
 }
 
@@ -357,6 +363,10 @@ test_patch_persists_cpa_plus_update_backend() {
     fail "self-update must disable installer systemd mode to avoid restart loops"
   grep -F "release_not_ready" "$patch" >/dev/null || \
     fail "integration patch must report release_not_ready when latest Release is not refreshed yet"
+  grep -F "90*time.Minute" "$patch" >/dev/null || \
+    fail "self-update must allow slow release downloads to finish"
+  grep -F -- "--property=RuntimeMaxSec=90min" "$patch" >/dev/null || \
+    fail "systemd self-update unit must have a long runtime cap for slow downloads"
 }
 
 test_generated_scripts_quote_single_quote_app_dir() {

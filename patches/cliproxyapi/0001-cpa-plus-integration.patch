@@ -219,7 +219,7 @@ index 5f0a03fb..4f6f5f40 100644
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 diff --git a/internal/api/handlers/management/config_basic.go b/internal/api/handlers/management/config_basic.go
-index a0818aa8..d70eb0d2 100644
+index a0818aa8..8f74120e 100644
 --- a/internal/api/handlers/management/config_basic.go
 +++ b/internal/api/handlers/management/config_basic.go
 @@ -1,13 +1,19 @@
@@ -322,7 +322,7 @@ index a0818aa8..d70eb0d2 100644
  	req.Header.Set("User-Agent", latestReleaseUserAgent)
  
  	resp, err := client.Do(req)
-@@ -67,28 +103,306 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
+@@ -67,28 +103,307 @@ func (h *Handler) GetLatestVersion(c *gin.Context) {
  		}
  	}()
  
@@ -528,7 +528,7 @@ index a0818aa8..d70eb0d2 100644
 +}
 +
 +func runCPAPlusUpdate(appDir string, logPath string, logFile *os.File) {
-+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
++	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Minute)
 +	defer cancel()
 +
 +	if cpaPlusSystemdRunAvailable() {
@@ -588,6 +588,7 @@ index a0818aa8..d70eb0d2 100644
 +		fmt.Sprintf("--unit=cpa-plus-self-update-%d", time.Now().UnixNano()),
 +		"--collect",
 +		"--property=Type=oneshot",
++		"--property=RuntimeMaxSec=90min",
 +		"--setenv=CPA_PLUS_SYSTEMD=0",
 +		"--working-directory=" + appDir,
 +		"/bin/sh",
@@ -694,10 +695,10 @@ index 00000000..12c572aa
 +}
 diff --git a/internal/api/handlers/management/cpa_plus_update_test.go b/internal/api/handlers/management/cpa_plus_update_test.go
 new file mode 100644
-index 00000000..38198b33
+index 00000000..cbd02d1f
 --- /dev/null
 +++ b/internal/api/handlers/management/cpa_plus_update_test.go
-@@ -0,0 +1,100 @@
+@@ -0,0 +1,101 @@
 +package management
 +
 +import (
@@ -772,6 +773,7 @@ index 00000000..38198b33
 +	for _, want := range []string{
 +		"--collect",
 +		"--property=Type=oneshot",
++		"--property=RuntimeMaxSec=90min",
 +		"--working-directory=" + appDir,
 +		cpaPlusUpdateCommand,
 +		logPath,
