@@ -33,7 +33,7 @@ index e280b0db..e1f72824 100644
  
  func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
-index 22173ab6..fa2653c2 100644
+index 551b4064..f83ca3a9 100644
 --- a/config.example.yaml
 +++ b/config.example.yaml
 @@ -49,6 +49,15 @@ pprof:
@@ -219,7 +219,7 @@ index 5f0a03fb..4f6f5f40 100644
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 diff --git a/internal/api/handlers/management/config_basic.go b/internal/api/handlers/management/config_basic.go
-index a0818aa8..8f74120e 100644
+index a0818aa8..459830b3 100644
 --- a/internal/api/handlers/management/config_basic.go
 +++ b/internal/api/handlers/management/config_basic.go
 @@ -1,13 +1,19 @@
@@ -395,8 +395,8 @@ index a0818aa8..8f74120e 100644
 +	commit, err := latestCommitFromAtom(body)
 +	if err != nil {
 +		c.JSON(http.StatusBadGateway, gin.H{"error": "invalid_response", "message": err.Error()})
-+		return
-+	}
+ 		return
+ 	}
 +	version := versionWithCommit(releaseTag, commit)
 +	c.JSON(http.StatusOK, gin.H{
 +		"latest-version": version,
@@ -406,7 +406,8 @@ index a0818aa8..8f74120e 100644
 +		"sha":            commit,
 +	})
 +}
-+
+ 
+-	c.JSON(http.StatusOK, gin.H{"latest-version": version})
 +// PostCPAPlusUpdate starts a local CPA-PLUS release update when the published
 +// latest Release binary differs from the currently installed binary.
 +func (h *Handler) PostCPAPlusUpdate(c *gin.Context) {
@@ -441,8 +442,8 @@ index a0818aa8..8f74120e 100644
 +	changed, currentSHA, err := cpaPlusReleaseChanged(binaryPath, string(body))
 +	if err != nil {
 +		c.JSON(http.StatusInternalServerError, gin.H{"error": "local_binary_check_failed", "message": err.Error()})
- 		return
- 	}
++		return
++	}
 +	if !changed {
 +		c.JSON(cpaPlusReleaseNotReadyHTTPStatus(), gin.H{
 +			"status":       "release_not_ready",
@@ -498,8 +499,7 @@ index a0818aa8..8f74120e 100644
 +	}
 +	return strings.ToLower(string(match[1])), nil
 +}
- 
--	c.JSON(http.StatusOK, gin.H{"latest-version": version})
++
 +func shortVersionCommit(value string) string {
 +	trimmed := strings.TrimSpace(value)
 +	if len(trimmed) > 8 {
@@ -726,7 +726,7 @@ index 00000000..12c572aa
 +}
 diff --git a/internal/api/handlers/management/cpa_plus_update_test.go b/internal/api/handlers/management/cpa_plus_update_test.go
 new file mode 100644
-index 00000000..cbd02d1f
+index 00000000..159075e2
 --- /dev/null
 +++ b/internal/api/handlers/management/cpa_plus_update_test.go
 @@ -0,0 +1,119 @@
