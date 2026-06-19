@@ -65,6 +65,46 @@ require_cmd git
 require_cmd python3
 require_cmd rsync
 
+merge_overlay_locales() {
+  local overlay_dir="$1"
+  local target_dir="$2"
+  python3 - "$overlay_dir" "$target_dir" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+overlay_dir = Path(sys.argv[1])
+target_dir = Path(sys.argv[2])
+overlay_locale_dir = overlay_dir / "src" / "i18n" / "locales"
+target_locale_dir = target_dir / "src" / "i18n" / "locales"
+
+
+def deep_merge(base, overlay):
+    if isinstance(base, dict) and isinstance(overlay, dict):
+        merged = dict(base)
+        for key, value in overlay.items():
+            merged[key] = deep_merge(merged.get(key), value)
+        return merged
+    return overlay
+
+
+if not overlay_locale_dir.is_dir():
+    raise SystemExit(0)
+
+for overlay_file in sorted(overlay_locale_dir.glob("*.json")):
+    target_file = target_locale_dir / overlay_file.name
+    if target_file.exists():
+        base = json.loads(target_file.read_text(encoding="utf-8"))
+    else:
+        base = {}
+    overlay = json.loads(overlay_file.read_text(encoding="utf-8"))
+    merged = deep_merge(base, overlay)
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+    target_file.write_text(json.dumps(merged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"merged overlay locale {overlay_file.name}")
+PY
+}
+
 mkdir -p "${WORK_DIR}/src" "$(dirname "${OUT_DIR}")"
 
 if [[ "${KEEP_WORK}" != "1" ]]; then
@@ -123,7 +163,10 @@ python3 "${WEB_PATCHER}" "${OUT_DIR}/web/manager-plus"
 
 WEB_OVERLAY="${ROOT_DIR}/cpa-plus-web/overlay"
 if [[ -d "${WEB_OVERLAY}" ]]; then
-  rsync -a "${WEB_OVERLAY}/" "${OUT_DIR}/web/manager-plus/"
+  rsync -a \
+    --exclude 'src/i18n/locales/*.json' \
+    "${WEB_OVERLAY}/" "${OUT_DIR}/web/manager-plus/"
+  merge_overlay_locales "${WEB_OVERLAY}" "${OUT_DIR}/web/manager-plus"
 fi
 
 if [[ "${SKIP_LOCK}" != "1" && -f "${OUT_DIR}/web/manager-plus/package.json" && ! -f "${OUT_DIR}/web/manager-plus/package-lock.json" ]]; then

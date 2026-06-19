@@ -1,5 +1,5 @@
 diff --git a/cmd/server/main.go b/cmd/server/main.go
-index e280b0db..e1f72824 100644
+index a56ba307..2e3831f5 100644
 --- a/cmd/server/main.go
 +++ b/cmd/server/main.go
 @@ -39,10 +39,14 @@ import (
@@ -33,7 +33,7 @@ index e280b0db..e1f72824 100644
  
  func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
-index 22173ab6..fa2653c2 100644
+index 101f2391..6e99fb04 100644
 --- a/config.example.yaml
 +++ b/config.example.yaml
 @@ -49,6 +49,15 @@ pprof:
@@ -219,7 +219,7 @@ index 5f0a03fb..4f6f5f40 100644
  nullprogram.com/x/optparse v1.0.0/go.mod h1:KdyPE+Igbe0jQUrVfMqDMeJQIJZEuyV7pjYmp6pbG50=
  rsc.io/pdf v0.1.1/go.mod h1:n8OzWcQ6Sp37PL01nO98y4iUCRdTGarVfzxY20ICaU4=
 diff --git a/internal/api/handlers/management/config_basic.go b/internal/api/handlers/management/config_basic.go
-index a0818aa8..8f74120e 100644
+index a0818aa8..459830b3 100644
 --- a/internal/api/handlers/management/config_basic.go
 +++ b/internal/api/handlers/management/config_basic.go
 @@ -1,13 +1,19 @@
@@ -395,8 +395,8 @@ index a0818aa8..8f74120e 100644
 +	commit, err := latestCommitFromAtom(body)
 +	if err != nil {
 +		c.JSON(http.StatusBadGateway, gin.H{"error": "invalid_response", "message": err.Error()})
-+		return
-+	}
+ 		return
+ 	}
 +	version := versionWithCommit(releaseTag, commit)
 +	c.JSON(http.StatusOK, gin.H{
 +		"latest-version": version,
@@ -406,7 +406,8 @@ index a0818aa8..8f74120e 100644
 +		"sha":            commit,
 +	})
 +}
-+
+ 
+-	c.JSON(http.StatusOK, gin.H{"latest-version": version})
 +// PostCPAPlusUpdate starts a local CPA-PLUS release update when the published
 +// latest Release binary differs from the currently installed binary.
 +func (h *Handler) PostCPAPlusUpdate(c *gin.Context) {
@@ -441,8 +442,8 @@ index a0818aa8..8f74120e 100644
 +	changed, currentSHA, err := cpaPlusReleaseChanged(binaryPath, string(body))
 +	if err != nil {
 +		c.JSON(http.StatusInternalServerError, gin.H{"error": "local_binary_check_failed", "message": err.Error()})
- 		return
- 	}
++		return
++	}
 +	if !changed {
 +		c.JSON(cpaPlusReleaseNotReadyHTTPStatus(), gin.H{
 +			"status":       "release_not_ready",
@@ -498,8 +499,7 @@ index a0818aa8..8f74120e 100644
 +	}
 +	return strings.ToLower(string(match[1])), nil
 +}
- 
--	c.JSON(http.StatusOK, gin.H{"latest-version": version})
++
 +func shortVersionCommit(value string) string {
 +	trimmed := strings.TrimSpace(value)
 +	if len(trimmed) > 8 {
@@ -726,7 +726,7 @@ index 00000000..12c572aa
 +}
 diff --git a/internal/api/handlers/management/cpa_plus_update_test.go b/internal/api/handlers/management/cpa_plus_update_test.go
 new file mode 100644
-index 00000000..cbd02d1f
+index 00000000..159075e2
 --- /dev/null
 +++ b/internal/api/handlers/management/cpa_plus_update_test.go
 @@ -0,0 +1,119 @@
@@ -850,7 +850,7 @@ index 00000000..cbd02d1f
 +	}
 +}
 diff --git a/internal/api/handlers/management/handler.go b/internal/api/handlers/management/handler.go
-index c5b6daa6..e496b66b 100644
+index 78fd505d..d964e6fe 100644
 --- a/internal/api/handlers/management/handler.go
 +++ b/internal/api/handlers/management/handler.go
 @@ -264,10 +264,14 @@ func (h *Handler) SetPostAuthPersistHook(hook coreauth.PostAuthHook) {
@@ -871,7 +871,7 @@ index c5b6daa6..e496b66b 100644
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index 4572d3c1..901fada4 100644
+index beacc18a..6e9ed764 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -924,7 +924,7 @@ index 4572d3c1..901fada4 100644
  	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
  	managementRoutesRegistered atomic.Bool
  	// managementRoutesEnabled controls whether management endpoints serve real handlers.
-@@ -336,6 +363,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -337,6 +364,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	if optionState.localPassword != "" {
  		s.mgmt.SetLocalPassword(optionState.localPassword)
  	}
@@ -939,7 +939,7 @@ index 4572d3c1..901fada4 100644
  	logDir := logging.ResolveLogDirectory(cfg)
  	s.mgmt.SetLogDirectory(logDir)
  	if optionState.postAuthHook != nil {
-@@ -352,6 +387,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -353,6 +388,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  
  	// Setup routes
  	s.setupRoutes()
@@ -954,7 +954,7 @@ index 4572d3c1..901fada4 100644
  
  	// Apply additional router configurators from options
  	if optionState.routerConfigurator != nil {
-@@ -362,7 +405,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -363,7 +406,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	// or when a local management password is provided (e.g. TUI mode).
  	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
  	s.managementRoutesEnabled.Store(hasManagementSecret)
@@ -964,7 +964,7 @@ index 4572d3c1..901fada4 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -610,11 +654,26 @@ func (s *Server) registerManagementRoutes() {
+@@ -611,11 +655,26 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -991,7 +991,7 @@ index 4572d3c1..901fada4 100644
  		mgmt.GET("/plugins", s.mgmt.ListPlugins)
  		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
  		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
-@@ -747,6 +806,7 @@ func (s *Server) registerManagementRoutes() {
+@@ -748,6 +807,7 @@ func (s *Server) registerManagementRoutes() {
  		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
@@ -999,7 +999,7 @@ index 4572d3c1..901fada4 100644
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -774,6 +834,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -775,6 +835,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -1119,7 +1119,7 @@ index 4572d3c1..901fada4 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -861,6 +1034,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -862,6 +1035,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -1131,7 +1131,7 @@ index 4572d3c1..901fada4 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1501,6 +1679,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1502,6 +1680,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -1146,7 +1146,7 @@ index 4572d3c1..901fada4 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1612,6 +1798,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1616,6 +1802,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -1155,7 +1155,7 @@ index 4572d3c1..901fada4 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1643,10 +1831,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1647,10 +1835,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -1479,7 +1479,7 @@ index 00000000..e77859e4
 +	}
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
-index 9f8ba44e..80a5138f 100644
+index 885cbdf2..cbf630fe 100644
 --- a/internal/config/config.go
 +++ b/internal/config/config.go
 @@ -43,6 +43,9 @@ type Config struct {
@@ -1492,7 +1492,7 @@ index 9f8ba44e..80a5138f 100644
  	// Plugins configures dynamic plugin discovery and per-plugin settings.
  	Plugins PluginsConfig `yaml:"plugins" json:"plugins"`
  
-@@ -158,6 +161,46 @@ type Config struct {
+@@ -165,6 +168,46 @@ type Config struct {
  	Payload PayloadConfig `yaml:"payload" json:"payload"`
  }
  
@@ -1539,7 +1539,7 @@ index 9f8ba44e..80a5138f 100644
  // PluginsConfig holds dynamic plugin system settings.
  type PluginsConfig struct {
  	// Enabled toggles dynamic plugin loading.
-@@ -660,6 +703,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -667,6 +710,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  			if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
  				// Missing and optional: return empty config (cloud deploy standby).
  				cfg := &Config{}
@@ -1548,7 +1548,7 @@ index 9f8ba44e..80a5138f 100644
  				cfg.NormalizePluginsConfig()
  				return cfg, nil
  			}
-@@ -670,6 +715,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -677,6 +722,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	// In cloud deploy mode (optional=true), if file is empty or contains only whitespace, return empty config.
  	if optional && len(data) == 0 {
  		cfg := &Config{}
@@ -1557,7 +1557,7 @@ index 9f8ba44e..80a5138f 100644
  		cfg.NormalizePluginsConfig()
  		return cfg, nil
  	}
-@@ -688,10 +735,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -697,10 +744,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	cfg.Pprof.Enable = false
  	cfg.Pprof.Addr = DefaultPprofAddr
  	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
@@ -1571,7 +1571,7 @@ index 9f8ba44e..80a5138f 100644
  			cfgOptional.NormalizePluginsConfig()
  			return cfgOptional, nil
  		}
-@@ -741,6 +791,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -750,6 +800,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  		cfg.MaxRetryCredentials = 0
  	}
  
@@ -1580,10 +1580,10 @@ index 9f8ba44e..80a5138f 100644
  
  	// Sanitize Gemini API key configuration and migrate legacy entries.
 diff --git a/internal/config/parse.go b/internal/config/parse.go
-index b097976c..a2be594d 100644
+index 82e1e032..19aa4cb1 100644
 --- a/internal/config/parse.go
 +++ b/internal/config/parse.go
-@@ -29,6 +29,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
+@@ -31,6 +31,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
  	cfg.Pprof.Enable = false
  	cfg.Pprof.Addr = DefaultPprofAddr
  	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
@@ -1591,7 +1591,7 @@ index b097976c..a2be594d 100644
  
  	if err := yaml.Unmarshal(data, &cfg); err != nil {
  		return nil, fmt.Errorf("parse config payload: %w", err)
-@@ -72,6 +73,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
+@@ -74,6 +75,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
  		cfg.MaxRetryCredentials = 0
  	}
  

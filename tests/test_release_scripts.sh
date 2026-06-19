@@ -355,6 +355,16 @@ PY
   done
 }
 
+test_prepare_source_merges_overlay_locales() {
+  local script="$ROOT_DIR/cpa-plus-core/prepare-source.sh"
+  grep -F -- "--exclude 'src/i18n/locales/*.json'" "$script" >/dev/null || \
+    fail "prepare-source must not let overlay locale JSON files replace upstream locales"
+  grep -F 'merge_overlay_locales' "$script" >/dev/null || \
+    fail "prepare-source must deep-merge overlay locale JSON files into upstream locales"
+  grep -F 'merged overlay locale' "$script" >/dev/null || \
+    fail "prepare-source must report merged overlay locale files"
+}
+
 test_plus_web_integrates_account_action_candidate_paths() {
   local patcher="$ROOT_DIR/cpa-plus-web/patch-plus-web-integrated.py"
   grep -F "'/v0/management/account-action-candidates'" "$patcher" >/dev/null || \
@@ -554,6 +564,7 @@ main() {
   test_ai_provider_overlay_keeps_toolbar_i18n
   test_overlay_keeps_plugin_and_account_action_i18n
   test_overlay_keeps_plugin_store_i18n
+  test_prepare_source_merges_overlay_locales
   test_plus_web_integrates_account_action_candidate_paths
   test_patch_persists_cpa_plus_update_backend
   test_generated_scripts_quote_single_quote_app_dir
