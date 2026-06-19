@@ -183,13 +183,13 @@ cli_upstream_version() {
 
 plus_upstream_version() {
   local exact nearest short
+  short="$(git -C "${PLUS_DIR}" rev-parse --short=8 HEAD)"
   exact="$(git -C "${PLUS_DIR}" describe --tags --exact-match 2>/dev/null || true)"
   if [[ -n "${exact}" ]]; then
-    printf '%s\n' "${exact}"
+    printf '%s+%s\n' "${exact}" "${short}"
     return
   fi
   nearest="$(git -C "${PLUS_DIR}" describe --tags --abbrev=0 2>/dev/null || true)"
-  short="$(git -C "${PLUS_DIR}" rev-parse --short=8 HEAD)"
   if [[ -n "${nearest}" ]]; then
     printf '%s+%s\n' "${nearest}" "${short}"
   else
