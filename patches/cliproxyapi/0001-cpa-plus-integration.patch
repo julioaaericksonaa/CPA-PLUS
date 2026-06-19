@@ -1,5 +1,5 @@
 diff --git a/cmd/server/main.go b/cmd/server/main.go
-index a56ba307..2e3831f5 100644
+index dde0678c..e1dc7f68 100644
 --- a/cmd/server/main.go
 +++ b/cmd/server/main.go
 @@ -39,10 +39,14 @@ import (
@@ -33,7 +33,7 @@ index a56ba307..2e3831f5 100644
  
  func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
-index 101f2391..6e99fb04 100644
+index 83896efc..150a6eae 100644
 --- a/config.example.yaml
 +++ b/config.example.yaml
 @@ -49,6 +49,15 @@ pprof:
@@ -871,7 +871,7 @@ index 78fd505d..d964e6fe 100644
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index beacc18a..6e9ed764 100644
+index e6c23722..3eaa0a80 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -964,7 +964,7 @@ index beacc18a..6e9ed764 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -611,11 +655,26 @@ func (s *Server) registerManagementRoutes() {
+@@ -595,11 +639,26 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -991,7 +991,7 @@ index beacc18a..6e9ed764 100644
  		mgmt.GET("/plugins", s.mgmt.ListPlugins)
  		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
  		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
-@@ -748,6 +807,7 @@ func (s *Server) registerManagementRoutes() {
+@@ -731,6 +790,7 @@ func (s *Server) registerManagementRoutes() {
  		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
@@ -999,7 +999,7 @@ index beacc18a..6e9ed764 100644
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -775,6 +835,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -758,6 +818,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -1119,7 +1119,7 @@ index beacc18a..6e9ed764 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -862,6 +1035,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -845,6 +1018,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -1131,7 +1131,7 @@ index beacc18a..6e9ed764 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1502,6 +1680,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1485,6 +1663,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -1146,7 +1146,7 @@ index beacc18a..6e9ed764 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1616,6 +1802,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1599,6 +1785,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -1155,7 +1155,7 @@ index beacc18a..6e9ed764 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1647,10 +1835,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1630,10 +1818,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -1479,7 +1479,7 @@ index 00000000..e77859e4
 +	}
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
-index 885cbdf2..cbf630fe 100644
+index 11d8f48b..e25e0824 100644
 --- a/internal/config/config.go
 +++ b/internal/config/config.go
 @@ -43,6 +43,9 @@ type Config struct {
