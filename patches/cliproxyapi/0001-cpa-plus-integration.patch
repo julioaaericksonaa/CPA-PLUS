@@ -33,7 +33,7 @@ index dde0678c..e1dc7f68 100644
  
  func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
-index 83896efc..150a6eae 100644
+index c480b2f5..c5d4ef4b 100644
 --- a/config.example.yaml
 +++ b/config.example.yaml
 @@ -49,6 +49,15 @@ pprof:
@@ -53,7 +53,7 @@ index 83896efc..150a6eae 100644
  # Build Go examples with go build -buildmode=c-shared for the target GOOS/GOARCH.
  # Other languages can implement the same C ABI and JSON method protocol.
 diff --git a/go.mod b/go.mod
-index 3418dbad..08a51863 100644
+index c83d19ce..ad1a486d 100644
 --- a/go.mod
 +++ b/go.mod
 @@ -17,6 +17,7 @@ require (
@@ -98,7 +98,7 @@ index 3418dbad..08a51863 100644
  	gopkg.in/ini.v1 v1.67.0 // indirect
  )
 diff --git a/go.sum b/go.sum
-index 5f0a03fb..4f6f5f40 100644
+index d9f1ac7f..c8cb8623 100644
 --- a/go.sum
 +++ b/go.sum
 @@ -14,6 +14,10 @@ github.com/atotto/clipboard v0.1.4 h1:EH0zSVneZPSuFR11BlR9YppQTVDbh5+16AmcJi4g1z
@@ -127,7 +127,7 @@ index 5f0a03fb..4f6f5f40 100644
  github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
  github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
  github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=
-@@ -152,6 +160,8 @@ github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELU
+@@ -154,6 +162,8 @@ github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELU
  github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
  github.com/muesli/termenv v0.16.0 h1:S5AlUN9dENB57rsbnkPyfdGuWIlkmzJjbFf0Tf5FWUc=
  github.com/muesli/termenv v0.16.0/go.mod h1:ZRfOIKPFDYQoDFF4Olj7/QJbW60Ol/kL1pU3VfY/Cnk=
@@ -136,7 +136,7 @@ index 5f0a03fb..4f6f5f40 100644
  github.com/pelletier/go-toml/v2 v2.2.2 h1:aYUidT7k73Pcl9nb2gScu7NSrKCSHIDE89b3+6Wq+LM=
  github.com/pelletier/go-toml/v2 v2.2.2/go.mod h1:1t835xjRzz80PqgE6HHgN2JOsmgYu/h4qDAS4n929Rs=
  github.com/pierrec/xxHash v0.1.5 h1:n/jBpwTHiER4xYvK3/CdPVnLDPchj8eTJFFLUb4QHBo=
-@@ -164,6 +174,8 @@ github.com/redis/go-redis/v9 v9.19.0 h1:XPVaaPSnG6RhYf7p+rmSa9zZfeVAnWsH5h3lxthO
+@@ -166,6 +176,8 @@ github.com/redis/go-redis/v9 v9.19.0 h1:XPVaaPSnG6RhYf7p+rmSa9zZfeVAnWsH5h3lxthO
  github.com/redis/go-redis/v9 v9.19.0/go.mod h1:v/M13XI1PVCDcm01VtPFOADfZtHf8YW3baQf57KlIkA=
  github.com/refraction-networking/utls v1.8.2 h1:j4Q1gJj0xngdeH+Ox/qND11aEfhpgoEvV+S9iJ2IdQo=
  github.com/refraction-networking/utls v1.8.2/go.mod h1:jkSOEkLqn+S/jtpEHPOsVv/4V4EVnelwbMQl4vCWXAM=
@@ -145,7 +145,7 @@ index 5f0a03fb..4f6f5f40 100644
  github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=
  github.com/rivo/uniseg v0.4.7/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
  github.com/rogpeppe/go-internal v1.14.1 h1:UQB4HGPB6osV0SQTLymcB4TgvyWu6ZyliaW0tI/otEQ=
-@@ -207,6 +219,8 @@ github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65E
+@@ -209,6 +221,8 @@ github.com/ugorji/go/codec v1.2.12 h1:9LC83zGrHhuUA9l16C9AHXAqEV/2wBQ4nkvumAE65E
  github.com/ugorji/go/codec v1.2.12/go.mod h1:UNopzCgEMSXjBc6AOMqYvWC1ktqTAfzJZUZgYf6w6lg=
  github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e h1:JVG44RsyaB9T2KIHavMF/ppJZNG9ZpyihvCd0w101no=
  github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e/go.mod h1:RbqR21r5mrJuqunuUZ/Dhy/avygyECGrLceyNeo4LiM=
@@ -154,7 +154,7 @@ index 5f0a03fb..4f6f5f40 100644
  go.uber.org/atomic v1.11.0 h1:ZvwS0R+56ePWxUNi+Atn9dWONBPp/AUETXlHW0DxSjE=
  go.uber.org/atomic v1.11.0/go.mod h1:LUxbIzbOniOlMKjJjyPfpl4v+PKK2cNJn91OQbhoJI0=
  golang.org/x/arch v0.0.0-20210923205945-b76863e36670/go.mod h1:5om86z9Hs0C8fWVUuoMHwpExlXzs5Tkyp9hOrfG7pp8=
-@@ -216,21 +230,25 @@ golang.org/x/crypto v0.45.0 h1:jMBrvKuj23MTlT0bQEOBcAE0mjg8mK9RXFhRH6nyF3Q=
+@@ -218,21 +232,25 @@ golang.org/x/crypto v0.45.0 h1:jMBrvKuj23MTlT0bQEOBcAE0mjg8mK9RXFhRH6nyF3Q=
  golang.org/x/crypto v0.45.0/go.mod h1:XTGrrkGJve7CYK7J8PEww4aY7gM3qMCElcJQ8n8JdX4=
  golang.org/x/exp v0.0.0-20231006140011-7918f672742d h1:jtJma62tbqLibJ5sFQz8bKtEM8rJBtfilJ2qTU199MI=
  golang.org/x/exp v0.0.0-20231006140011-7918f672742d/go.mod h1:ldy0pHrwJyGW56pPQzzkH36rKxoZW1tw7ZJpeKx+hdo=
@@ -184,7 +184,7 @@ index 5f0a03fb..4f6f5f40 100644
  golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
  golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543/go.mod h1:I/5z698sn9Ka8TeJc9MKroUUfqBBauWjQqLJ2OPfmY0=
  google.golang.org/protobuf v1.34.1 h1:9ddQBjfCyZPOHPUiPxpYESBLc+T8P3E+Vo4IbKZgFWg=
-@@ -248,5 +266,33 @@ gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
+@@ -250,5 +268,33 @@ gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
  gopkg.in/yaml.v3 v3.0.0-20200313102051-9f266ea9e77c/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
  gopkg.in/yaml.v3 v3.0.1 h1:fxVm/GzAzEWqLHuvctI91KS9hhNmmWOoWu0XTYJS7CA=
  gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
@@ -871,7 +871,7 @@ index 78fd505d..d964e6fe 100644
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index e6c23722..3eaa0a80 100644
+index bddd963b..055cabd9 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -885,7 +885,7 @@ index e6c23722..3eaa0a80 100644
  	"encoding/json"
  	"errors"
  	"fmt"
-@@ -31,6 +33,12 @@ import (
+@@ -32,6 +34,12 @@ import (
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
@@ -896,9 +896,9 @@ index e6c23722..3eaa0a80 100644
 +	plusstore "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/store"
 +	plusworker "github.com/router-for-me/CLIProxyAPI/v7/internal/plusmanager/worker"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
+ 	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
  	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
- 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v7/sdk/access"
-@@ -222,6 +230,25 @@ type Server struct {
+@@ -224,6 +232,25 @@ type Server struct {
  	// pluginHost owns dynamic plugin Management API route dispatch.
  	pluginHost *pluginhost.Host
  
@@ -924,7 +924,7 @@ index e6c23722..3eaa0a80 100644
  	// managementRoutesRegistered tracks whether the management routes have been attached to the engine.
  	managementRoutesRegistered atomic.Bool
  	// managementRoutesEnabled controls whether management endpoints serve real handlers.
-@@ -337,6 +364,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -339,6 +366,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	if optionState.localPassword != "" {
  		s.mgmt.SetLocalPassword(optionState.localPassword)
  	}
@@ -939,7 +939,7 @@ index e6c23722..3eaa0a80 100644
  	logDir := logging.ResolveLogDirectory(cfg)
  	s.mgmt.SetLogDirectory(logDir)
  	if optionState.postAuthHook != nil {
-@@ -353,6 +388,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -355,6 +390,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  
  	// Setup routes
  	s.setupRoutes()
@@ -954,7 +954,7 @@ index e6c23722..3eaa0a80 100644
  
  	// Apply additional router configurators from options
  	if optionState.routerConfigurator != nil {
-@@ -363,7 +406,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
+@@ -365,7 +408,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
  	// or when a local management password is provided (e.g. TUI mode).
  	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
  	s.managementRoutesEnabled.Store(hasManagementSecret)
@@ -964,7 +964,7 @@ index e6c23722..3eaa0a80 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -595,11 +639,26 @@ func (s *Server) registerManagementRoutes() {
+@@ -597,11 +641,26 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -991,7 +991,7 @@ index e6c23722..3eaa0a80 100644
  		mgmt.GET("/plugins", s.mgmt.ListPlugins)
  		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
  		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
-@@ -731,6 +790,7 @@ func (s *Server) registerManagementRoutes() {
+@@ -734,6 +793,7 @@ func (s *Server) registerManagementRoutes() {
  		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
@@ -999,7 +999,7 @@ index e6c23722..3eaa0a80 100644
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -758,6 +818,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -761,6 +821,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -1119,7 +1119,7 @@ index e6c23722..3eaa0a80 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -845,6 +1018,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -848,6 +1021,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -1131,7 +1131,7 @@ index e6c23722..3eaa0a80 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1485,6 +1663,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1527,6 +1705,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -1146,7 +1146,7 @@ index e6c23722..3eaa0a80 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1599,6 +1785,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1641,6 +1827,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -1155,7 +1155,7 @@ index e6c23722..3eaa0a80 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1630,10 +1818,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1672,10 +1860,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -1179,7 +1179,7 @@ index e6c23722..3eaa0a80 100644
  	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
  		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 diff --git a/internal/api/server_test.go b/internal/api/server_test.go
-index 0f42cac1..57f2ac5e 100644
+index 320776ba..1898d688 100644
 --- a/internal/api/server_test.go
 +++ b/internal/api/server_test.go
 @@ -1,6 +1,7 @@
@@ -1479,7 +1479,7 @@ index 00000000..e77859e4
 +	}
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
-index 11d8f48b..e25e0824 100644
+index ffb67e42..ef9ff03d 100644
 --- a/internal/config/config.go
 +++ b/internal/config/config.go
 @@ -43,6 +43,9 @@ type Config struct {
@@ -1539,7 +1539,7 @@ index 11d8f48b..e25e0824 100644
  // PluginsConfig holds dynamic plugin system settings.
  type PluginsConfig struct {
  	// Enabled toggles dynamic plugin loading.
-@@ -667,6 +710,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -670,6 +713,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  			if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
  				// Missing and optional: return empty config (cloud deploy standby).
  				cfg := &Config{}
@@ -1548,7 +1548,7 @@ index 11d8f48b..e25e0824 100644
  				cfg.NormalizePluginsConfig()
  				return cfg, nil
  			}
-@@ -677,6 +722,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -680,6 +725,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	// In cloud deploy mode (optional=true), if file is empty or contains only whitespace, return empty config.
  	if optional && len(data) == 0 {
  		cfg := &Config{}
@@ -1557,7 +1557,7 @@ index 11d8f48b..e25e0824 100644
  		cfg.NormalizePluginsConfig()
  		return cfg, nil
  	}
-@@ -697,10 +744,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -700,10 +747,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	cfg.Pprof.Enable = false
  	cfg.Pprof.Addr = DefaultPprofAddr
  	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
@@ -1571,7 +1571,7 @@ index 11d8f48b..e25e0824 100644
  			cfgOptional.NormalizePluginsConfig()
  			return cfgOptional, nil
  		}
-@@ -750,6 +800,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -753,6 +803,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  		cfg.MaxRetryCredentials = 0
  	}
  
