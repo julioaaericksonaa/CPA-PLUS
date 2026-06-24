@@ -146,6 +146,12 @@ test_workflow_release_notes_include_refresh_time() {
     fail "workflow release notes must include the refresh time"
 }
 
+test_workflow_disables_setup_go_root_cache() {
+  local wf="$ROOT_DIR/.github/workflows/auto-sync-release.yml"
+  grep -F 'cache: false' "$wf" >/dev/null || \
+    fail "workflow must disable setup-go cache because go.sum is generated under .build/out"
+}
+
 test_update_command_fetches_installer_from_main_by_default() {
   grep -F 'REF="${CPA_PLUS_INSTALL_REF:-main}"' "$ROOT_DIR/scripts/install-release.sh" >/dev/null || \
     fail "install-release.sh must default installer ref to main"
@@ -559,6 +565,7 @@ main() {
   test_workflow_detects_upstream_before_heavy_steps
   test_workflow_keeps_only_latest_release
   test_workflow_release_notes_include_refresh_time
+  test_workflow_disables_setup_go_root_cache
   test_local_publish_script_recreates_latest_release
   test_update_command_fetches_installer_from_main_by_default
   test_plus_build_version_uses_tag_and_commit
