@@ -1,8 +1,8 @@
 diff --git a/cmd/server/main.go b/cmd/server/main.go
-index dde0678c..e1dc7f68 100644
+index 80b029f3..0b5f6e82 100644
 --- a/cmd/server/main.go
 +++ b/cmd/server/main.go
-@@ -39,10 +39,14 @@ import (
+@@ -40,10 +40,14 @@ import (
  )
  
  var (
@@ -21,7 +21,7 @@ index dde0678c..e1dc7f68 100644
  )
  
  // init initializes the shared logger setup.
-@@ -51,6 +55,10 @@ func init() {
+@@ -52,6 +56,10 @@ func init() {
  	buildinfo.Version = Version
  	buildinfo.Commit = Commit
  	buildinfo.BuildDate = BuildDate
@@ -871,7 +871,7 @@ index 78fd505d..d964e6fe 100644
  		clientIP := c.ClientIP()
  		localClient := clientIP == "127.0.0.1" || clientIP == "::1"
 diff --git a/internal/api/server.go b/internal/api/server.go
-index bddd963b..055cabd9 100644
+index 01875fd6..ab707ac9 100644
 --- a/internal/api/server.go
 +++ b/internal/api/server.go
 @@ -6,8 +6,10 @@ package api
@@ -964,7 +964,7 @@ index bddd963b..055cabd9 100644
  	if hasManagementSecret {
  		s.registerManagementRoutes()
  	}
-@@ -597,11 +641,26 @@ func (s *Server) registerManagementRoutes() {
+@@ -600,11 +644,26 @@ func (s *Server) registerManagementRoutes() {
  
  	mgmt := s.engine.Group("/v0/management")
  	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
@@ -991,15 +991,15 @@ index bddd963b..055cabd9 100644
  		mgmt.GET("/plugins", s.mgmt.ListPlugins)
  		mgmt.GET("/plugin-store", s.mgmt.ListPluginStore)
  		mgmt.POST("/plugin-store/:id/install", s.mgmt.InstallPluginFromStore)
-@@ -734,6 +793,7 @@ func (s *Server) registerManagementRoutes() {
- 		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
+@@ -736,6 +795,7 @@ func (s *Server) registerManagementRoutes() {
+ 		mgmt.GET("/xai-auth-url", s.mgmt.RequestXAIToken)
  		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
  	}
 +	s.startPlusCodexInspectionWorker()
  }
  
  func (s *Server) managementAvailabilityMiddleware() gin.HandlerFunc {
-@@ -761,6 +821,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
+@@ -763,6 +823,119 @@ func (s *Server) managementAvailable(c *gin.Context) bool {
  	return true
  }
  
@@ -1119,7 +1119,7 @@ index bddd963b..055cabd9 100644
  func (s *Server) refreshPluginManagementRoutes() {
  	if s == nil || s.pluginHost == nil || s.engine == nil {
  		return
-@@ -848,6 +1021,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
+@@ -850,6 +1023,11 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
  		c.AbortWithStatus(http.StatusNotFound)
  		return
  	}
@@ -1131,7 +1131,7 @@ index bddd963b..055cabd9 100644
  	filePath := managementasset.FilePath(s.configFilePath)
  	if strings.TrimSpace(filePath) == "" {
  		c.AbortWithStatus(http.StatusNotFound)
-@@ -1527,6 +1705,14 @@ func (s *Server) Stop(ctx context.Context) error {
+@@ -1529,6 +1707,14 @@ func (s *Server) Stop(ctx context.Context) error {
  			log.Debugf("failed to close shared listener: %v", errClose)
  		}
  	}
@@ -1146,7 +1146,7 @@ index bddd963b..055cabd9 100644
  
  	// Shutdown the HTTP server.
  	if err := s.server.Shutdown(ctx); err != nil {
-@@ -1641,6 +1827,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1643,6 +1829,8 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  		util.SetLogLevel(cfg)
  	}
  
@@ -1155,7 +1155,7 @@ index bddd963b..055cabd9 100644
  	prevSecretEmpty := true
  	if oldCfg != nil {
  		prevSecretEmpty = oldCfg.RemoteManagement.SecretKey == ""
-@@ -1672,10 +1860,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
+@@ -1674,10 +1862,20 @@ func (s *Server) UpdateClients(cfg *config.Config) {
  			s.managementRoutesEnabled.Store(!newSecretEmpty)
  		}
  	}
@@ -1179,7 +1179,7 @@ index bddd963b..055cabd9 100644
  	if oldCfg != nil && s.wsAuthChanged != nil && oldCfg.WebsocketAuth != cfg.WebsocketAuth {
  		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 diff --git a/internal/api/server_test.go b/internal/api/server_test.go
-index 320776ba..1898d688 100644
+index 011c1f1e..05329df4 100644
 --- a/internal/api/server_test.go
 +++ b/internal/api/server_test.go
 @@ -1,6 +1,7 @@
@@ -1190,7 +1190,7 @@ index 320776ba..1898d688 100644
  	"encoding/json"
  	"net/http"
  	"net/http/httptest"
-@@ -52,7 +53,56 @@ func newTestServerWithOptions(t *testing.T, opts ...ServerOption) *Server {
+@@ -53,7 +54,56 @@ func newTestServerWithOptions(t *testing.T, opts ...ServerOption) *Server {
  	accessManager := sdkaccess.NewManager()
  
  	configPath := filepath.Join(tmpDir, "config.yaml")
@@ -1248,7 +1248,7 @@ index 320776ba..1898d688 100644
  }
  
  func TestHealthz(t *testing.T) {
-@@ -122,6 +172,95 @@ func TestManagementResponseExposesPluginSupportHeaderForCORS(t *testing.T) {
+@@ -147,6 +197,95 @@ func TestOAuthCallbackRouteSkipsManagementKeyMiddleware(t *testing.T) {
  	}
  }
  
