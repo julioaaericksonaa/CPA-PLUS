@@ -33,7 +33,7 @@ index 80b029f3..0b5f6e82 100644
  
  func shouldStartExampleAPIKeyWarningServer(cfg *config.Config, commandMode, tuiMode, standalone, cloudConfigMissing, homeMode bool) bool {
 diff --git a/config.example.yaml b/config.example.yaml
-index d4708f8b..6345b91d 100644
+index f8d6ed83..7407442b 100644
 --- a/config.example.yaml
 +++ b/config.example.yaml
 @@ -49,6 +49,15 @@ pprof:
@@ -1480,10 +1480,10 @@ index 00000000..e77859e4
 +	}
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
-index cc110730..34827516 100644
+index 85240dda..908097d1 100644
 --- a/internal/config/config.go
 +++ b/internal/config/config.go
-@@ -43,6 +43,9 @@ type Config struct {
+@@ -44,6 +44,9 @@ type Config struct {
  	// RemoteManagement nests management-related options under 'remote-management'.
  	RemoteManagement RemoteManagement `yaml:"remote-management" json:"-"`
  
@@ -1493,7 +1493,7 @@ index cc110730..34827516 100644
  	// Plugins configures dynamic plugin discovery and per-plugin settings.
  	Plugins PluginsConfig `yaml:"plugins" json:"plugins"`
  
-@@ -165,6 +168,46 @@ type Config struct {
+@@ -166,6 +169,46 @@ type Config struct {
  	Payload PayloadConfig `yaml:"payload" json:"payload"`
  }
  
@@ -1540,7 +1540,7 @@ index cc110730..34827516 100644
  // PluginsConfig holds dynamic plugin system settings.
  type PluginsConfig struct {
  	// Enabled toggles dynamic plugin loading.
-@@ -688,6 +731,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -691,6 +734,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  			if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
  				// Missing and optional: return empty config (cloud deploy standby).
  				cfg := &Config{}
@@ -1549,7 +1549,7 @@ index cc110730..34827516 100644
  				cfg.NormalizePluginsConfig()
  				return cfg, nil
  			}
-@@ -698,6 +743,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -701,6 +746,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	// In cloud deploy mode (optional=true), if file is empty or contains only whitespace, return empty config.
  	if optional && len(data) == 0 {
  		cfg := &Config{}
@@ -1558,7 +1558,7 @@ index cc110730..34827516 100644
  		cfg.NormalizePluginsConfig()
  		return cfg, nil
  	}
-@@ -718,10 +765,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -721,10 +768,13 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  	cfg.Pprof.Enable = false
  	cfg.Pprof.Addr = DefaultPprofAddr
  	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
@@ -1572,7 +1572,7 @@ index cc110730..34827516 100644
  			cfgOptional.NormalizePluginsConfig()
  			return cfgOptional, nil
  		}
-@@ -771,6 +821,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
+@@ -774,6 +824,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
  		cfg.MaxRetryCredentials = 0
  	}
  
