@@ -1480,7 +1480,7 @@ index 00000000..e77859e4
 +	}
 +}
 diff --git a/internal/config/config.go b/internal/config/config.go
-index 85240dda..908097d1 100644
+index 7fe3120f..80592ed2 100644
 --- a/internal/config/config.go
 +++ b/internal/config/config.go
 @@ -44,6 +44,9 @@ type Config struct {
